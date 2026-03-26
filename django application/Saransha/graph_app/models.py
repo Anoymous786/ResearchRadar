@@ -9,6 +9,12 @@ class Users_Publication(models.Model):
     user_email = models.CharField(max_length=100, unique=True,default='')
     user_password = models.CharField(max_length=100, default='')
     user_category = models.CharField(max_length=50, default='')
+    role = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        choices=[('student', 'student'), ('faculty', 'faculty'), ('organization', 'organization')],
+    )
 
     
 
@@ -86,3 +92,55 @@ class FacultyProfile(models.Model):
     class Meta:
         verbose_name = "Faculty Profile"
         verbose_name_plural = "Faculty Profiles"
+
+
+class StudentProfile(models.Model):
+    """
+    Extended student profile for resume-based analysis.
+    """
+
+    user = models.OneToOneField(
+        Users_Publication,
+        on_delete=models.CASCADE,
+        related_name="student_profile",
+    )
+
+    # Required by spec
+    profile_pic = models.ImageField(upload_to="student_profiles/", blank=True, null=True)
+    cgpa = models.DecimalField(max_digits=4, decimal_places=2, blank=True, null=True)
+    skills = models.TextField(blank=True, default="")
+    interests = models.TextField(blank=True, default="")
+    projects = models.TextField(blank=True, default="")
+    experience = models.TextField(blank=True, default="")
+    resume = models.FileField(upload_to="resumes/", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Extra fields already present in older migrations in this repo
+    full_name = models.CharField(max_length=200, blank=True, default="")
+    email = models.CharField(max_length=150, blank=True, default="")
+    phone = models.CharField(max_length=20, blank=True, default="")
+    branch = models.CharField(max_length=200, blank=True, default="")
+    college = models.CharField(max_length=200, blank=True, default="")
+    degree = models.CharField(max_length=200, blank=True, default="")
+    target_role = models.CharField(max_length=200, blank=True, default="")
+    year = models.IntegerField(blank=True, null=True)
+
+    # Approval / freeze system
+    approval_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("Pending", "Pending"),
+            ("Approved", "Approved"),
+            ("Rejected", "Rejected"),
+        ],
+        default="Pending",
+    )
+    is_approved = models.BooleanField(default=False)
+    approval_requested = models.BooleanField(default=False)
+
+    def __str__(self) -> str:
+        return f"{self.full_name or self.user.user_name} - Student Profile"
+
+    class Meta:
+        verbose_name = "Student Profile"
+        verbose_name_plural = "Student Profiles"

@@ -271,6 +271,15 @@
     </div>
   </nav>
 
+  {% if error_message %}
+    <div class="container mt-3">
+      <div class="alert alert-danger alert-dismissible fade show" role="alert" style="border-radius: var(--radius-lg); border-left: 4px solid var(--color-error);">
+        <strong>Error:</strong> {{ error_message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- Generate Summary Content -->
   <div class="container my-5">
     <div class="page-header animate-fade-in">

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analysis Output - ResearchRader</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'styles.css' %}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body { background-color: #f8f9fa; }
+    .navbar {
+      background: linear-gradient(90deg, rgb(112, 128, 144), rgb(192, 192, 192));
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .navbar-brand { font-weight: bold; font-size: 1.75rem; color: white; }
+    .navbar-nav .nav-link { font-weight: bold; font-size: 1.1rem; padding: 0px 7px; color: white; }
+    .navbar-nav .nav-link:hover { color: #d4d4d4; }
+    .profile-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2.5rem 0;
+      margin-bottom: 2rem;
+      border-radius: 0 0 20px 20px;
+    }
+    .section-card { background: white; border-radius: 16px; padding: 1.25rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    pre.analysis {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.03);
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container p-1">
+      <a class="navbar-brand" href="#"><i class="bi bi-file-ppt-fill"></i>&nbsp;&nbsp;ResearchRader</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{% url 'student_dashboard' %}">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'student_upload' %}">Upload</a></li>
+          <li class="nav-item"><a class="nav-link active" href="{% url 'student_analyze' %}">Generate Summary</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'student_dashboard' %}">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'settings' %}">Settings</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  {% if error_message %}
+    <div class="container mt-3">
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> {{ error_message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="profile-header">
+    <div class="container">
+      <h2 class="mb-0"><i class="bi bi-graph-up me-2"></i> Analysis Output</h2>
+      <p class="mb-0 mt-2 opacity-75">Resume ATS + Job Match plus optional research paper analysis.</p>
+    </div>
+  </div>
+
+  <div class="container mb-5">
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <div class="section-card">
+          <h4 class="mb-3"><i class="bi bi-sliders me-2"></i> Target Role</h4>
+          <form method="post" action="{% url 'student_analyze' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">What role are you applying for?</label>
+              <input class="form-control" type="text" name="target_role" placeholder="e.g., Software Engineer, Data Scientist, Research Assistant" value="{% if resume_analysis_json %}{{ resume_analysis_json.job_match.target_role|default:'' }}{% endif %}"/>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Detected Info (from resume)</label>
+              <div class="small text-muted">
+                <div><strong>Name:</strong> {{ resume_fields.name|default:"-" }}</div>
+                <div><strong>Email:</strong> {{ resume_fields.email|default:"-" }}</div>
+                <div><strong>Phone:</strong> {{ resume_fields.phone|default:"-" }}</div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100">
+              <i class="bi bi-magic me-2"></i> Generate AI Analysis
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="col-lg-7">
+        {% if resume_analysis_json %}
+          <div class="section-card mb-4">
+            <h4 class="mb-3"><i class="bi bi-file-earmark-text me-2"></i> Resume Analyzer</h4>
+
+            <div class="mb-3">
+              <div class="muted mb-1 fw-semibold">Resume Score (0–100)</div>
+              <div style="font-size: 1.8rem; font-weight: 800;">{{ resume_analysis_json.resume_score }}</div>
+            </div>
+
+            <hr>
+            <h5 class="mt-3 mb-2">Strengths</h5>
+            <ul class="mb-3">
+              {% for s in resume_analysis_json.strengths %}
+                <li>{{ s }}</li>
+              {% endfor %}
+            </ul>
+
+            <h5 class="mt-3 mb-2">Weaknesses (CONS)</h5>
+            <ul class="mb-3">
+              {% for w in resume_analysis_json.weaknesses_cons %}
+                <li>{{ w }}</li>
+              {% endfor %}
+            </ul>
+
+            <h5 class="mt-3 mb-2">Skills Analysis</h5>
+            <div class="mb-3">
+              <div class="fw-semibold">Technical</div>
+              <ul class="text-muted mb-2">
+                {% for t in resume_analysis_json.skills_analysis.technical %}
+                  <li>{{ t }}</li>
+                {% endfor %}
+              </ul>
+
+              <div class="fw-semibold mt-2">Analytical</div>
+              <ul class="text-muted mb-2">
+                {% for a in resume_analysis_json.skills_analysis.analytical %}
+                  <li>{{ a }}</li>
+                {% endfor %}
+              </ul>
+
+              <div class="fw-semibold mt-2">Soft</div>
+              <ul class="text-muted mb-0">
+                {% for s in resume_analysis_json.skills_analysis.soft %}
+                  <li>{{ s }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+
+            <h5 class="mt-3 mb-2">ATS Score</h5>
+            <div class="text-muted mb-3">
+              <div><strong>ATS compatibility score:</strong> {{ resume_analysis_json.ats_score.ats_compatibility }}/100</div>
+              <div><strong>Keyword match:</strong> {{ resume_analysis_json.ats_score.keyword_optimization.match_percentage }}%</div>
+              <div><strong>Matched keywords:</strong>
+                {% if resume_analysis_json.ats_score.keyword_optimization.matched_keywords %}
+                  <span class="text-muted">
+                    {% for k in resume_analysis_json.ats_score.keyword_optimization.matched_keywords %}
+                      {{ k }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </span>
+                {% else %}-{% endif %}
+              </div>
+              <div><strong>Missing keywords:</strong>
+                {% if resume_analysis_json.ats_score.keyword_optimization.missing_keywords %}
+                  <span class="text-muted">
+                    {% for k in resume_analysis_json.ats_score.keyword_optimization.missing_keywords %}
+                      {{ k }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </span>
+                {% else %}-{% endif %}
+              </div>
+            </div>
+
+            <h5 class="mt-3 mb-2">Job Match for {{ resume_analysis_json.job_match.target_role|default:"your role" }}</h5>
+            <div class="text-muted mb-3">
+              <div><strong>Match percentage:</strong> {{ resume_analysis_json.job_match.match_percentage }}%</div>
+              <div><strong>Missing skills:</strong>
+                <span class="text-muted">
+                  {% for ms in resume_analysis_json.job_match.missing_skills %}
+                    {{ ms }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </span>
+              </div>
+            </div>
+
+            <h5 class="mt-3 mb-2">Skill Gap Analysis</h5>
+            <div class="text-muted mb-3">
+              <div><strong>Missing trending skills:</strong>
+                <span class="text-muted">
+                  {% for g in resume_analysis_json.skill_gap_analysis.missing_trending_skills %}
+                    {{ g }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </span>
+              </div>
+              <div><strong>Gap list:</strong>
+                <span class="text-muted">
+                  {% for g in resume_analysis_json.skill_gap_analysis.fixed_gap_comparison %}
+                    {{ g }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </span>
+              </div>
+            </div>
+
+            <h5 class="mt-3 mb-2">Content Quality</h5>
+            <div class="mb-3 text-muted">
+              <div class="fw-semibold">Grammar</div>
+              <ul>
+                {% for g in resume_analysis_json.content_quality.grammar_check %}
+                  <li>{{ g }}</li>
+                {% endfor %}
+              </ul>
+
+              <div class="fw-semibold mt-2">Clarity</div>
+              <ul>
+                {% for c in resume_analysis_json.content_quality.clarity_check %}
+                  <li>{{ c }}</li>
+                {% endfor %}
+              </ul>
+
+              <div class="fw-semibold mt-2">Section presence</div>
+              <div>
+                Contact: {{ resume_analysis_json.content_quality.section_presence.contact|yesno:"Yes,No" }} |
+                Education: {{ resume_analysis_json.content_quality.section_presence.education|yesno:"Yes,No" }} |
+                Skills: {{ resume_analysis_json.content_quality.section_presence.skills|yesno:"Yes,No" }} |
+                Projects: {{ resume_analysis_json.content_quality.section_presence.projects|yesno:"Yes,No" }} |
+                Experience: {{ resume_analysis_json.content_quality.section_presence.experience|yesno:"Yes,No" }}
+              </div>
+            </div>
+
+            <h5 class="mt-3 mb-2">Suggestions</h5>
+            <ul class="mb-0">
+              {% for tip in resume_analysis_json.suggestions %}
+                <li>{{ tip }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        {% if resume_fields %}
+          <div class="section-card">
+            <h4 class="mb-3"><i class="bi bi-list-check me-2"></i> Resume Sections Extracted</h4>
+
+            <div class="mb-3">
+              <h5 class="mb-1">Education</h5>
+              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.education|default:"-" }}</div>
+            </div>
+
+            <div class="mb-3">
+              <h5 class="mb-1">Skills</h5>
+              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.skills|default:"-" }}</div>
+            </div>
+
+            <div class="mb-3">
+              <h5 class="mb-1">Projects</h5>
+              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.projects|default:"-" }}</div>
+            </div>
+
+            <div class="mb-0">
+              <h5 class="mb-1">Experience</h5>
+              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.experience|default:"-" }}</div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if paper_analysis_output %}
+          <div class="section-card">
+            <h4 class="mb-3"><i class="bi bi-journal-text me-2"></i> Research Paper Analyzer (Bonus)</h4>
+            <pre class="analysis">{{ paper_analysis_output }}</pre>
+          </div>
+        {% endif %}
+
+        {% if not resume_analysis_json and not paper_analysis_output and not error_message %}
+          <div class="section-card">
+            <p class="mb-0 text-muted">
+              Upload your resume first, then click <strong>Generate AI Analysis</strong> to see the output here.
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

@@ -26,6 +26,16 @@ urlpatterns = [
     path('faculty/publication/add/', views.faculty_publication_add, name='faculty_publication_add'),
     path('faculty/publication/edit/<int:pub_id>/', views.faculty_publication_edit, name='faculty_publication_edit'),
     path('faculty/publication/delete/<int:pub_id>/', views.faculty_publication_delete, name='faculty_publication_delete'),
+    path('faculty/student-approvals/', views.faculty_student_approvals, name='faculty_student_approvals'),
+    path('chatbot/', views.chatbot, name='chatbot'),
+
+    # =====================================================
+    # Student module (resume + paper analyzers)
+    # =====================================================
+    path('student/dashboard/', views.student_dashboard, name='student_dashboard'),
+    path('student/upload/', views.upload_resume, name='student_upload'),
+    path('student/analyze/', views.generate_resume_analysis, name='student_analyze'),
+    path('student/research/', views.research_paper_analysis, name='research_paper_analysis'),
 ]
 
 # Serve media files in development

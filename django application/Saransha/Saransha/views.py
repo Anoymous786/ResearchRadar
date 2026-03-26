@@ -10,9 +10,14 @@ import openpyxl
 import os
 import io
 from datetime import datetime
+from graph_app.groq_client import generate_ai_response
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
+from graph_app.groq_client import generate_ai_response
 
 from .utils import (
-    load_and_filter_excel,
+    load_and_filter_excel,  
     get_publications_from_profile,
     get_publications_safe,
     process_profiles_from_excel,
@@ -20,9 +25,44 @@ from .utils import (
     update_publication_details
 )
 
-from graph_app.models import Users_Publication, FacultyProfile, Publication
+from graph_app.models import Users_Publication, FacultyProfile, Publication, StudentProfile
 from graph_app.forms import FacultyProfileForm
 import os
+from graph_app.student_ai import (
+    extract_pdf_text,
+    extract_resume_fields,
+    analyze_resume_with_groq,
+    analyze_research_paper_with_groq,
+    rule_based_resume_analysis,
+    rule_based_research_paper_analysis,
+    analyze_resume_rule_based_json,
+)
+
+
+FACULTY_ROLES = {'faculty', 'professor', 'associate professor', 'assistant professor'}
+
+
+def _get_effective_role(user: Users_Publication) -> str:
+    """
+    Prefer the new `role` field; fall back to legacy `user_category` for backward compatibility.
+    """
+    role = (getattr(user, "role", "") or "").lower().strip()
+    if role in {"student", "faculty", "organization"}:
+        # Treat organization accounts as student for dashboard/routing purposes.
+        return "student" if role == "organization" else role
+
+    user_category = (getattr(user, "user_category", "") or "").lower().strip()
+    if user_category in FACULTY_ROLES:
+        return "faculty"
+
+    # Default to student if it's not clearly faculty.
+    return "student"
+
+
+def _get_logged_in_user(request):
+    if "user_email" not in request.session:
+        return None
+    return Users_Publication.objects.filter(user_email=request.session["user_email"]).first()
 
 
 # =====================================================
@@ -32,6 +72,11 @@ import os
 def upload_page(request):
     if "user_email" not in request.session:
         return redirect("login")
+
+    # Faculty-only area; keep student users out of the Excel pipeline.
+    user = _get_logged_in_user(request)
+    if user and _get_effective_role(user) != "faculty":
+        return redirect("student_dashboard")
 
     excel_data = []
     publications_data = []
@@ -69,7 +114,10 @@ def upload_page(request):
                     output_file = fs.path("all_authors_publications.xlsx")
                     pd.DataFrame(publications).to_excel(output_file, index=False)
                     print(f"[SUCCESS] Saved to {output_file}")
-
+                    messages.success(request, success_message)
+                    return redirect("faculty_profile")
+                
+                messages.error(request, error_message or "Failed to fetch Google Scholar data.")
                 return render(request, "auth/upload.html", locals())
 
             except Exception as e:
@@ -122,6 +170,11 @@ def upload_page(request):
             except Exception as e:
                 error_message = str(e)
 
+    # If we successfully processed uploads, take the faculty back to their profile dashboard.
+    if success_message and not error_message:
+        messages.success(request, success_message)
+        return redirect("faculty_profile")
+
     return render(request, "auth/upload.html", locals())
 
 
@@ -132,6 +185,10 @@ def upload_page(request):
 def generatesummary(request):
     if "user_email" not in request.session:
         return redirect("login")
+
+    user = _get_logged_in_user(request)
+    if user and _get_effective_role(user) != "faculty":
+        return redirect("student_dashboard")
 
     fs = FileSystemStorage()
     output_file_path = fs.path("all_authors_publications.xlsx")
@@ -214,7 +271,19 @@ def generatesummary(request):
 # =====================================================
 
 def home(request):
-    return render(request, "auth/index.html" if "user_email" in request.session else "index.html")
+    if "user_email" not in request.session:
+        return render(request, "index.html")
+
+    user = _get_logged_in_user(request)
+    if user and _get_effective_role(user) == "student":
+        return redirect("student_dashboard")
+
+    # For faculty, route to the existing faculty dashboard UI.
+    if user and _get_effective_role(user) == "faculty":
+        return redirect("faculty_profile")
+
+    # Fallback: treat any other role as student.
+    return redirect("student_dashboard")
 
 
 def login(request):
@@ -224,8 +293,25 @@ def login(request):
 
         user = Users_Publication.objects.filter(user_email=email).first()
         if user and str(user.user_password) == str(password):
+            # Clear student analyzer-related session so results don't "carry" across profiles.
+            for k in [
+                "resume_text",
+                "resume_fields",
+                "resume_analysis_json",
+                "resume_analysis_output",
+                "paper_text",
+                "paper_analysis_output",
+            ]:
+                request.session.pop(k, None)
+
             request.session["user_email"] = email
-            return redirect("home")
+
+            role = _get_effective_role(user)
+            if role == "student":
+                return redirect("student_dashboard")
+            if role == "faculty":
+                return redirect("faculty_profile")
+            return redirect("student_dashboard")
 
         return render(request, "login.html", {"error": "Invalid credentials"})
 
@@ -240,7 +326,18 @@ def signup(request):
         username = request.POST.get("username", "").strip()
         password = request.POST.get("password", "")
         category = request.POST.get("category", "")
-        user_category = category.lower() if category else ""
+        category_value = (category or "").lower().strip()
+
+        # Map signup selection into the required `role` values.
+        role = category_value if category_value in {"student", "faculty", "organization"} else ""
+        if role == "":
+            # Backward compatibility: map legacy faculty wording to faculty, everything else to student.
+            if category_value in FACULTY_ROLES:
+                role = "faculty"
+            else:
+                role = "student"
+
+        user_category = role
         
         # Validate required fields
         if not email or not username or not password or not category:
@@ -250,7 +347,7 @@ def signup(request):
         # Check if email already exists before attempting to create
         if Users_Publication.objects.filter(user_email=email).exists():
             error_message = "Email already registered. Please use a different email or try logging in."
-            return render(request, "signup.html", {"error": error_message})
+            return render(request, "    signup.html", {"error": error_message})
         
         # Create the user with error handling
         try:
@@ -258,11 +355,12 @@ def signup(request):
                 user_name=username,
                 user_email=email,
                 user_password=password,
-                user_category=category
+                user_category=user_category,
+                role=role,
             )
             
-            # Auto-create FacultyProfile if user is a faculty member
-            if user_category in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+            # Auto-create profile
+            if role == "faculty":
                 try:
                     FacultyProfile.objects.create(
                         user=new_user,
@@ -271,6 +369,14 @@ def signup(request):
                 except Exception as e:
                     # Log error but don't break signup process
                     print(f"Warning: Could not create FacultyProfile for {new_user.user_email}: {str(e)}")
+
+            if role == "student":
+                try:
+                    StudentProfile.objects.create(
+                        user=new_user,
+                    )
+                except Exception as e:
+                    print(f"Warning: Could not create StudentProfile for {new_user.user_email}: {str(e)}")
             
             # Success - redirect to login
             messages.success(request, "Account created successfully! Please login.")
@@ -293,6 +399,421 @@ def signup(request):
 def logo_view(request):
     request.session.flush()
     return redirect("home")
+
+
+# =====================================================
+# STUDENT MODULE (resume + paper analyzers)
+# =====================================================
+
+def student_dashboard(request):
+    user = _get_logged_in_user(request)
+    if user is None:
+        return redirect("login")
+
+    if _get_effective_role(user) != "student":
+        return redirect("home")
+
+    profile, _ = StudentProfile.objects.get_or_create(user=user)
+
+    resume_analysis_json = request.session.get("resume_analysis_json", {})
+    paper_analysis_output = request.session.get("paper_analysis_output", "")
+    paper_uploaded = bool(request.session.get("paper_text"))
+
+    # Prefill empty manual fields with account values (student can override anytime if not approved).
+    if not profile.full_name and user.user_name:
+        profile.full_name = user.user_name
+    if not profile.email and user.user_email:
+        profile.email = user.user_email
+    if not profile.phone and getattr(user, "user_phone", None):
+        profile.phone = user.user_phone
+    if not profile.phone:
+        # keep blank if user model doesn't have phone
+        pass
+    profile.save(update_fields=["full_name", "email"])
+
+    # Handle profile update and approval request.
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+
+        # Freeze system: once approved, student cannot edit.
+        # But allow students to re-request approval (which re-opens editing).
+        if profile.is_approved and action != "request_approval":
+            messages.warning(request, "Your profile is approved and is now read-only.")
+            return redirect("student_dashboard")
+
+        if action == "save_profile":
+            full_name = request.POST.get("full_name", "").strip()
+            email = request.POST.get("email", "").strip()
+            phone = request.POST.get("phone", "").strip()
+            cgpa_raw = request.POST.get("cgpa", "").strip()
+            skills = request.POST.get("skills", "").strip()
+            interests = request.POST.get("interests", "").strip()
+            projects = request.POST.get("projects", "").strip()
+            experience = request.POST.get("experience", "").strip()
+
+            profile.full_name = full_name
+            profile.email = email
+            profile.phone = phone
+            profile.skills = skills
+            profile.interests = interests
+            profile.projects = projects
+            profile.experience = experience
+
+            if cgpa_raw:
+                try:
+                    profile.cgpa = cgpa_raw
+                except Exception:
+                    profile.cgpa = None
+            else:
+                profile.cgpa = None
+
+            profile.save()
+            messages.success(request, "Profile saved. You can request approval when ready.")
+            return redirect("student_dashboard")
+
+        if action == "request_approval":
+            profile.approval_status = "Pending"
+            profile.is_approved = False
+            profile.approval_requested = True
+            profile.save(update_fields=["approval_status", "is_approved", "approval_requested"])
+            messages.success(request, "Approval requested. Faculty will review your profile.")
+            return redirect("student_dashboard")
+
+    return render(
+        request,
+        "student/student_dashboard.html",
+        {
+            "profile": profile,
+            "resume_analysis_json": resume_analysis_json,
+            "paper_analysis_output": paper_analysis_output,
+            "paper_uploaded": paper_uploaded,
+        },
+    )
+
+
+def upload_resume(request):
+    """
+    Upload student resume PDF (and optionally a research paper PDF),
+    parse the PDF text locally, and store extracted fields in session.
+    """
+    user = _get_logged_in_user(request)
+    if user is None:
+        return redirect("login")
+
+    if _get_effective_role(user) != "student":
+        return redirect("home")
+
+    profile, _ = StudentProfile.objects.get_or_create(user=user)
+
+    extracted_fields = request.session.get("resume_fields", {})
+    error_message = None
+    success_message = None
+
+    if request.method == "POST":
+        resume_file = request.FILES.get("resume_file")
+        paper_file = request.FILES.get("paper_file")
+
+        if not resume_file:
+            error_message = "Please upload your resume PDF."
+            return render(
+                request,
+                "student/upload_resume.html",
+                {
+                    "profile": profile,
+                    "extracted_fields": extracted_fields,
+                    "success_message": success_message,
+                    "error_message": error_message,
+                    "resume_analysis_json": request.session.get("resume_analysis_json", {}),
+                    "paper_analysis_output": request.session.get("paper_analysis_output", ""),
+                },
+            )
+
+        if not resume_file.name.lower().endswith(".pdf"):
+            error_message = "Resume must be a PDF file."
+            return render(
+                request,
+                "student/upload_resume.html",
+                {
+                    "profile": profile,
+                    "extracted_fields": extracted_fields,
+                    "success_message": success_message,
+                    "error_message": error_message,
+                    "resume_analysis_json": request.session.get("resume_analysis_json", {}),
+                    "paper_analysis_output": request.session.get("paper_analysis_output", ""),
+                },
+            )
+
+        # Extract resume text first, then save file (so we can parse without reloading).
+        try:
+            resume_text = extract_pdf_text(resume_file)
+            resume_fields = extract_resume_fields(resume_text)
+        except Exception as e:
+            error_message = f"Failed to extract resume text: {str(e)}"
+            return render(
+                request,
+                "student/upload_resume.html",
+                {
+                    "profile": profile,
+                    "extracted_fields": extracted_fields,
+                    "success_message": success_message,
+                    "error_message": error_message,
+                    "resume_analysis_json": request.session.get("resume_analysis_json", {}),
+                    "paper_analysis_output": request.session.get("paper_analysis_output", ""),
+                },
+            )
+
+        # Save resume file to the StudentProfile.
+        try:
+            resume_file.seek(0)
+            profile.resume.save(resume_file.name, resume_file, save=True)
+        except Exception as e:
+            error_message = f"Failed to save resume: {str(e)}"
+            return render(
+                request,
+                "student/upload_resume.html",
+                {
+                    "profile": profile,
+                    "extracted_fields": extracted_fields,
+                    "success_message": success_message,
+                    "error_message": error_message,
+                    "resume_analysis_json": request.session.get("resume_analysis_json", {}),
+                    "paper_analysis_output": request.session.get("paper_analysis_output", ""),
+                },
+            )
+
+        # Optional research paper upload (bonus).
+        paper_text = None
+        if paper_file and paper_file.name.lower().endswith(".pdf"):
+            try:
+                paper_text = extract_pdf_text(paper_file)
+            except Exception:
+                paper_text = None
+
+        request.session["resume_text"] = resume_text
+        request.session["resume_fields"] = resume_fields
+        request.session["paper_text"] = paper_text or ""
+        request.session["resume_analysis_output"] = ""
+        request.session["paper_analysis_output"] = ""
+        request.session.modified = True
+
+        # Generate an immediate analysis so the UI never shows only "extracted details".
+        # This uses rule-based logic (fast + reliable). Users can still regenerate on /student/analyze/.
+        try:
+            default_target_role = "General Software/Tech Role"
+            request.session["resume_analysis_json"] = analyze_resume_rule_based_json(
+                resume_text,
+                target_role=default_target_role,
+            )
+            if paper_text:
+                request.session["paper_analysis_output"] = rule_based_research_paper_analysis(paper_text)
+            request.session.modified = True
+        except Exception as e:
+            # Never block upload if analysis generation fails; but surface why it failed.
+            error_message = f"Resume uploaded, but resume analyzer failed: {str(e)}"
+            request.session["resume_analysis_json"] = {}
+            request.session.modified = True
+
+        # Only show a success toast if we also produced analyzer output.
+        success_message = "Resume uploaded and parsed successfully." if not error_message else None
+        extracted_fields = resume_fields
+
+        if success_message:
+            messages.success(request, success_message)
+            # After upload, go to Home/Profile so the student sees updated profile + analyzer.
+            return redirect("student_dashboard")
+
+    return render(
+        request,
+        "student/upload_resume.html",
+        {
+            "profile": profile,
+            "extracted_fields": extracted_fields,
+            "error_message": error_message,
+            "success_message": success_message,
+            "resume_analysis_json": request.session.get("resume_analysis_json", {}),
+            "paper_analysis_output": request.session.get("paper_analysis_output", ""),
+        },
+    )
+
+
+def generate_resume_analysis(request):
+    user = _get_logged_in_user(request)
+    if user is None:
+        return redirect("login")
+
+    if _get_effective_role(user) != "student":
+        return redirect("home")
+
+    profile, _ = StudentProfile.objects.get_or_create(user=user)
+
+    if not profile.resume:
+        return render(
+            request,
+            "student/analyze_resume.html",
+            {
+                "profile": profile,
+                "error_message": "Please upload your resume first.",
+                "resume_fields": request.session.get("resume_fields", {}),
+                "resume_analysis_json": {},
+                "paper_analysis_output": "",
+            },
+        )
+
+    resume_fields = request.session.get("resume_fields", {})
+    resume_text = request.session.get("resume_text", "")
+    paper_text = request.session.get("paper_text", "")
+
+    error_message = None
+    resume_analysis_json = request.session.get("resume_analysis_json", {})
+    paper_analysis_output = request.session.get("paper_analysis_output", "")
+    typed_target_role = request.POST.get("target_role", "").strip() if request.method == "POST" else ""
+
+    # If resume_text isn't in session (e.g., refreshed tab), extract again from stored PDF.
+    if not resume_text:
+        try:
+            with profile.resume.open("rb") as f:
+                resume_text = extract_pdf_text(f)
+            request.session["resume_text"] = resume_text
+            if not resume_fields:
+                request.session["resume_fields"] = extract_resume_fields(resume_text)
+            request.session.modified = True
+        except Exception as e:
+            error_message = f"Failed to extract resume PDF text: {str(e)}"
+
+    # If analysis JSON is missing (e.g., session cleared), regenerate rule-based analysis on GET.
+    if not error_message and not resume_analysis_json and resume_text:
+        try:
+            resume_analysis_json = analyze_resume_rule_based_json(resume_text, target_role=typed_target_role or "Software Developer")
+            request.session["resume_analysis_json"] = resume_analysis_json
+            request.session.modified = True
+        except Exception as e:
+            error_message = f"Error generating resume analysis: {str(e)}"
+
+    if request.method == "POST" and not error_message:
+        try:
+            resume_analysis_json = analyze_resume_rule_based_json(
+                resume_text,
+                target_role=typed_target_role or "Software Developer",
+            )
+        except Exception as e:
+            error_message = f"Error generating resume analysis: {str(e)}"
+
+        if paper_text:
+            # Rule-based only (NO API).
+            try:
+                paper_analysis_output = rule_based_research_paper_analysis(paper_text)
+            except Exception as e:
+                paper_analysis_output = f"Error generating research paper analysis: {str(e)}"
+        else:
+            paper_analysis_output = ""
+
+        request.session["resume_analysis_json"] = resume_analysis_json
+        request.session["paper_analysis_output"] = paper_analysis_output
+        request.session.modified = True
+
+    return render(
+        request,
+        "student/analyze_resume.html",
+        {
+            "profile": profile,
+            "error_message": error_message,
+            "resume_fields": resume_fields,
+            "resume_analysis_json": resume_analysis_json,
+            "paper_analysis_output": paper_analysis_output,
+        },
+    )
+
+
+def research_paper_analysis(request):
+    """
+    Bonus-only endpoint: analyze the uploaded research paper (if present in session).
+    """
+    user = _get_logged_in_user(request)
+    if user is None:
+        return redirect("login")
+
+    if _get_effective_role(user) != "student":
+        return redirect("home")
+
+    profile, _ = StudentProfile.objects.get_or_create(user=user)
+    resume_fields = request.session.get("resume_fields", {})
+    paper_text = request.session.get("paper_text", "") or ""
+
+    error_message = None
+    paper_analysis_output = request.session.get("paper_analysis_output", "")
+
+    if request.method == "POST":
+        if not paper_text.strip():
+            error_message = "Please upload a research paper PDF first (optional on the resume upload page)."
+        else:
+            try:
+                # Rule-based only (NO API).
+                paper_analysis_output = rule_based_research_paper_analysis(paper_text)
+                request.session["paper_analysis_output"] = paper_analysis_output
+                request.session.modified = True
+            except Exception as e:
+                error_message = f"Error generating research paper analysis: {str(e)}"
+
+    return render(
+        request,
+        "student/analyze_resume.html",
+        {
+            "profile": profile,
+            "error_message": error_message,
+            "resume_fields": resume_fields,
+            "resume_analysis_json": request.session.get("resume_analysis_json", {}),
+            "paper_analysis_output": paper_analysis_output,
+        },
+    )
+
+
+def faculty_student_approvals(request):
+    """
+    Faculty page: view submitted student profiles and approve/reject them.
+    """
+    user = _get_logged_in_user(request)
+    if user is None:
+        return redirect("login")
+
+    if _get_effective_role(user) != "faculty":
+        return redirect("home")
+
+    if request.method == "POST":
+        profile_id = request.POST.get("profile_id", "")
+        decision = request.POST.get("decision", "")
+
+        try:
+            student_profile = StudentProfile.objects.get(id=int(profile_id))
+        except Exception:
+            messages.error(request, "Student profile not found.")
+            return redirect("faculty_student_approvals")
+
+        if decision == "approve":
+            student_profile.approval_status = "Approved"
+            student_profile.is_approved = True
+            student_profile.approval_requested = True
+            student_profile.save(update_fields=["approval_status", "is_approved", "approval_requested"])
+            messages.success(request, "Student profile approved.")
+        elif decision == "reject":
+            student_profile.approval_status = "Rejected"
+            student_profile.is_approved = False
+            student_profile.approval_requested = True
+            student_profile.save(update_fields=["approval_status", "is_approved", "approval_requested"])
+            messages.warning(request, "Student profile rejected. Student can edit and request again.")
+        else:
+            messages.error(request, "Invalid action.")
+
+        return redirect("faculty_student_approvals")
+
+    submitted_profiles = StudentProfile.objects.filter(approval_requested=True).order_by("-created_at")
+
+    return render(
+        request,
+        "faculty/student_approvals.html",
+        {
+            "submitted_profiles": submitted_profiles,
+        },
+    )
 
 
 # =====================================================
@@ -483,10 +1004,10 @@ def faculty_profile(request):
         messages.error(request, "User not found. Please login again.")
         return redirect("login")
     
-    # Check if user is a faculty member
-    if user.user_category.lower() not in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+    # Check if user is a faculty member (supports both legacy `user_category` and new `role`)
+    if _get_effective_role(user) != "faculty":
         messages.warning(request, "This page is only accessible to faculty members.")
-        return redirect("login")
+        return redirect("home")
     
     # Get or create faculty profile
     try:
@@ -532,9 +1053,9 @@ def faculty_profile_edit(request):
         messages.error(request, "User not found. Please login again.")
         return redirect("login")
     
-    if user.user_category.lower() not in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+    if _get_effective_role(user) != "faculty":
         messages.warning(request, "This page is only accessible to faculty members.")
-        return redirect("login")
+        return redirect("home")
     
     try:
         profile = FacultyProfile.objects.get(user=user)
@@ -574,9 +1095,9 @@ def faculty_photo_change(request):
         messages.error(request, "User not found. Please login again.")
         return redirect("login")
     
-    if user.user_category.lower() not in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+    if _get_effective_role(user) != "faculty":
         messages.warning(request, "This page is only accessible to faculty members.")
-        return redirect("login")
+        return redirect("home")
     
     try:
         profile = FacultyProfile.objects.get(user=user)
@@ -617,9 +1138,9 @@ def faculty_photo_remove(request):
         messages.error(request, "User not found. Please login again.")
         return redirect("login")
     
-    if user.user_category.lower() not in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+    if _get_effective_role(user) != "faculty":
         messages.warning(request, "This page is only accessible to faculty members.")
-        return redirect("login")
+        return redirect("home")
     
     try:
         profile = FacultyProfile.objects.get(user=user)
@@ -655,9 +1176,9 @@ def faculty_publication_add(request):
         messages.error(request, "User not found. Please login again.")
         return redirect("login")
     
-    if user.user_category.lower() not in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+    if _get_effective_role(user) != "faculty":
         messages.warning(request, "This page is only accessible to faculty members.")
-        return redirect("login")
+        return redirect("home")
     
     try:
         profile = FacultyProfile.objects.get(user=user)
@@ -702,9 +1223,9 @@ def faculty_publication_edit(request, pub_id):
         messages.error(request, "User not found. Please login again.")
         return redirect("login")
     
-    if user.user_category.lower() not in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+    if _get_effective_role(user) != "faculty":
         messages.warning(request, "This page is only accessible to faculty members.")
-        return redirect("login")
+        return redirect("home")
     
     try:
         profile = FacultyProfile.objects.get(user=user)
@@ -730,34 +1251,59 @@ def faculty_publication_edit(request, pub_id):
         'profile': profile
     })
 
+@csrf_exempt
+def chatbot(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            user_input = data.get("message", "")
 
+            if not user_input:
+                return JsonResponse({"response": "Please enter a message."})
+
+            ai_response = generate_ai_response(user_input)
+
+            return JsonResponse({"response": ai_response})
+
+        except Exception as e:
+            return JsonResponse({"response": f"Error: {str(e)}"})
+
+    return JsonResponse({"response": "Invalid request"})
+
+
+# ---------------- DELETE PUBLICATION VIEW ----------------
 def faculty_publication_delete(request, pub_id):
     """View for deleting a publication"""
+
     if "user_email" not in request.session:
         return redirect("login")
-    
+
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
         return redirect("faculty_profile")
-    
+
     try:
-        user = Users_Publication.objects.get(user_email=request.session["user_email"])
+        user = Users_Publication.objects.get(
+            user_email=request.session["user_email"]
+        )
     except Users_Publication.DoesNotExist:
         messages.error(request, "User not found. Please login again.")
         return redirect("login")
-    
-    if user.user_category.lower() not in ['faculty', 'professor', 'associate professor', 'assistant professor']:
+
+    if _get_effective_role(user) != "faculty":
         messages.warning(request, "This page is only accessible to faculty members.")
-        return redirect("login")
-    
+        return redirect("home")
+
     try:
         profile = FacultyProfile.objects.get(user=user)
         publication = Publication.objects.get(id=pub_id, faculty=profile)
         publication.delete()
         messages.success(request, "Publication deleted successfully!")
+
     except (FacultyProfile.DoesNotExist, Publication.DoesNotExist):
         messages.error(request, "Publication not found.")
+
     except Exception as e:
         messages.error(request, f"Error deleting publication: {str(e)}")
-    
+
     return redirect("faculty_profile")

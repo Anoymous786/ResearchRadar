@@ -20,10 +20,10 @@ def user_context(request):
             user = Users_Publication.objects.get(user_email=request.session["user_email"])
             context['current_user'] = user
             
-            # Check if user is a faculty member
-            user_category = user.user_category.lower() if user.user_category else ""
-            faculty_categories = ['faculty', 'professor', 'associate professor', 'assistant professor']
-            context['is_faculty'] = user_category in faculty_categories
+            # Check if user is a faculty member (prefer `role` but keep backward compatibility with `user_category`)
+            role = (user.role or user.user_category or "").lower().strip()
+            faculty_roles = ['faculty', 'professor', 'associate professor', 'assistant professor']
+            context['is_faculty'] = role == 'faculty' or role in faculty_roles
         except Users_Publication.DoesNotExist:
             pass
     

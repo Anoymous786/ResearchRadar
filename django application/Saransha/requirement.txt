@@ -72,3 +72,4 @@ websocket-client==1.8.0
 wrapt==1.16.0
 wsproto==1.2.0
 google-generativeai
+PyPDF2==3.0.1
