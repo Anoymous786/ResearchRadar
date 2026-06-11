@@ -1,0 +1,208 @@
+{% extends "student/base_student.html" %}
+{% load static %}
+{% block title %}Insights - ResearchRadar{% endblock %}
+{% block body %}
+  <main class="container py-4">
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="card soft-card mb-4">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-3">Personal Info</h5>
+            <p class="mb-1"><strong>Name:</strong> {{ extracted_details.personal_info.name|default:"-" }}</p>
+            <p class="mb-1"><strong>Email:</strong> {{ extracted_details.personal_info.email|default:"-" }}</p>
+            <p class="mb-2"><strong>Phone:</strong> {{ extracted_details.personal_info.phone|default:"-" }}</p>
+            <p class="small text-secondary mb-3">{{ extracted_details.personal_info.summary|default:"No summary available." }}</p>
+            <p class="small text-secondary mb-1">Validation</p>
+            <div class="d-flex flex-wrap gap-2">
+              <span class="badge {% if result.validation.email_valid %}text-bg-success{% else %}text-bg-secondary{% endif %}">Email</span>
+              <span class="badge {% if result.validation.phone_valid %}text-bg-success{% else %}text-bg-secondary{% endif %}">Phone</span>
+              <span class="badge {% if result.validation.name_valid %}text-bg-success{% else %}text-bg-secondary{% endif %}">Name</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card soft-card">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-3">ATS and Match Score</h5>
+            <div class="score-value mb-2">{{ extracted_details.analysis.ats_score }}/100</div>
+            <div class="progress rounded-pill" role="progressbar" aria-label="ATS score">
+              <div class="progress-bar" style="width: {{ extracted_details.analysis.ats_score }}%"></div>
+            </div>
+            <p class="small text-secondary mt-3 mb-0">
+              Predicted Role: <strong>{{ extracted_details.analysis.predicted_role }}</strong>
+              ({{ extracted_details.analysis.match_score }}%)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-8">
+        <div class="card soft-card mb-4">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-3">Skills</h5>
+            <div class="d-flex flex-wrap gap-2">
+              {% for skill in extracted_details.skills %}
+                <span class="skill-tag">{{ skill }}</span>
+              {% empty %}
+                <span class="text-secondary">No technical skills detected.</span>
+              {% endfor %}
+            </div>
+            {% if extracted_details.analysis.missing_skills %}
+              <hr>
+              <h6 class="fw-semibold">Suggested Skills to Add</h6>
+              <div class="d-flex flex-wrap gap-2">
+                {% for skill in extracted_details.analysis.missing_skills %}
+                  <span class="skill-tag skill-missing">{{ skill }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+          <div class="col-md-6">
+            <div class="card soft-card h-100">
+              <div class="card-body">
+                <h5 class="fw-semibold mb-3">Experience</h5>
+                <div class="accordion" id="experienceAccordion">
+                  <div class="accordion-item">
+                    <h2 class="accordion-header">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#experienceCollapse">View Experience Entries</button>
+                    </h2>
+                    <div id="experienceCollapse" class="accordion-collapse collapse" data-bs-parent="#experienceAccordion">
+                      <div class="accordion-body">
+                        {% for item in extracted_details.experience %}
+                          <div class="mb-2">{{ item }}</div>
+                        {% empty %}
+                          <div class="text-secondary">No experience entries found.</div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card soft-card h-100">
+              <div class="card-body">
+                <h5 class="fw-semibold mb-3">Education</h5>
+                <div class="accordion" id="educationAccordion">
+                  <div class="accordion-item">
+                    <h2 class="accordion-header">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#educationCollapse">View Education Entries</button>
+                    </h2>
+                    <div id="educationCollapse" class="accordion-collapse collapse" data-bs-parent="#educationAccordion">
+                      <div class="accordion-body">
+                        {% for item in extracted_details.education %}
+                          <div class="mb-2">{{ item }}</div>
+                        {% empty %}
+                          <div class="text-secondary">No education entries found.</div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card soft-card mb-4">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-3">Projects</h5>
+            <div class="row g-3">
+              {% for project in extracted_details.projects %}
+                <div class="col-md-6">
+                  <div class="border rounded p-3 h-100 bg-light-subtle">
+                    <h6 class="fw-semibold">{{ project.title }}</h6>
+                    <p class="small text-secondary mb-2">{{ project.description|default:"No description available." }}</p>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                      {% for tech in project.tech_stack %}
+                        <span class="skill-tag">{{ tech }}</span>
+                      {% empty %}
+                        <span class="text-secondary small">No tech stack listed.</span>
+                      {% endfor %}
+                    </div>
+                    {% if project.links %}
+                      <div class="small">
+                        {% for link in project.links %}
+                          <a href="{{ link }}" target="_blank" rel="noopener noreferrer">Link {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              {% empty %}
+                <div class="col-12 text-secondary">No projects found.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="card soft-card mb-4">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-3">Interests and Certifications</h5>
+            <p class="small text-secondary mb-1">Interests</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              {% for interest in extracted_details.interests %}<span class="skill-tag">{{ interest }}</span>{% empty %}<span class="text-secondary">No interests found.</span>{% endfor %}
+            </div>
+            <p class="small text-secondary mb-1">Certifications</p>
+            <ul class="mb-0">
+              {% for cert in extracted_details.certifications %}<li>{{ cert }}</li>{% empty %}<li class="text-secondary">No certifications available.</li>{% endfor %}
+            </ul>
+          </div>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="card soft-card h-100">
+              <div class="card-body">
+                <h5 class="fw-semibold text-success mb-3">Strengths</h5>
+                <ul class="mb-0">
+                  {% for item in result.analysis.strengths %}
+                    <li>{{ item }}</li>
+                  {% empty %}
+                    <li class="text-secondary">No strengths identified.</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card soft-card h-100">
+              <div class="card-body">
+                <h5 class="fw-semibold text-danger mb-3">Weaknesses</h5>
+                <ul class="mb-0">
+                  {% for item in result.analysis.weaknesses %}
+                    <li>{{ item }}</li>
+                  {% empty %}
+                    <li class="text-secondary">No weaknesses identified.</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card soft-card mt-4">
+          <div class="card-body">
+            <h5 class="fw-semibold mb-3">Resume Tips and Keyword Coverage</h5>
+            <p class="mb-1"><strong>Keyword Match:</strong> {{ extracted_details.analysis.keyword_match_percentage }}%</p>
+            <p class="small text-secondary mb-1">Matched Keywords</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              {% for keyword in extracted_details.analysis.matched_keywords %}<span class="skill-tag">{{ keyword }}</span>{% empty %}<span class="text-secondary">No matched keywords found.</span>{% endfor %}
+            </div>
+            <ul class="mb-0">
+              {% for item in extracted_details.analysis.resume_tips %}
+                <li>{{ item }}</li>
+              {% empty %}
+                <li class="text-secondary">No suggestions right now.</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+{% endblock %}

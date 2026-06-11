@@ -115,7 +115,7 @@
     <!-- Premium Navbar -->
     <nav class="navbar navbar-expand-lg">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">
+            <a class="navbar-brand" href="{% url 'login' %}">
                 <i class="bi bi-file-ppt-fill"></i>
                 <span>ResearchRadar</span>
             </a>
@@ -124,9 +124,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'payment' %}">Pricing</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="{% url 'login' %}">Login</a></li>
                 </ul>
             </div>
         </div>

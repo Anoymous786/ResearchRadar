@@ -283,11 +283,25 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="#home">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'upload' %}">Upload</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'payment' %}">Pricing</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
-                    <li class="nav-item"><a class="nav-link btn btn-primary btn-sm" href="{% url 'login' %}">Login</a></li>
+                    {% if request.session.user_email %}
+                        {% if is_faculty %}
+                            <li class="nav-item"><a class="nav-link" href="{% url 'upload' %}">Upload</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}">Profile</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'faculty_student_approvals' %}">Student Approvals</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+                        {% else %}
+                            <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'student_upload' %}">Upload</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'student_profile' %}">Profile</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+                            <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+                        {% endif %}
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link active" href="{% url 'login' %}">Login</a></li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -312,12 +326,9 @@
                     The ultimate platform for researchers and academics.
                 </p>
                 <div class="hero-cta">
-                    <a href="{% url 'upload' %}" class="btn btn-primary btn-lg">
-                        Get Started
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-lg">
+                        Login
                         <i class="bi bi-arrow-right"></i>
-                    </a>
-                    <a href="{% url 'payment' %}" class="btn btn-secondary btn-lg">
-                        View Pricing
                     </a>
                 </div>
                 

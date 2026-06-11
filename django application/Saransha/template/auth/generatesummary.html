@@ -261,14 +261,12 @@
         <ul class="navbar-nav ms-auto">
           <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'upload' %}">Upload</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
           <li class="nav-item"><a class="nav-link active" href="{% url 'generatesummary' %}">Generate Summary</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'settings' %}">Settings</a></li>
-          {% if is_faculty %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}"><i class="bi bi-person-circle"></i> My Profile</a></li>
-          {% endif %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'payment' %}">Pricing</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">logout</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'faculty_student_approvals' %}">Student Approvals</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
         </ul>
       </div>
     </div>
@@ -358,12 +356,6 @@
             <a href="{% url 'dynamic_graph' %}" class="btn btn-primary btn-lg">
               <i class="bi bi-graph-up me-2"></i>Generate Visualization
             </a>
-            <a href="{% url 'cust' %}" class="btn btn-secondary btn-lg">
-              <i class="bi bi-plus-circle me-2"></i>New Records
-            </a>
-            <a href="{% url 'missVal' %}" class="btn btn-secondary btn-lg">
-              <i class="bi bi-pencil me-2"></i>Add Customs
-            </a>
           </div>
         </form>
       </div>
@@ -376,34 +368,7 @@
     </div>
   </div>
 
-  <!-- Chat with the Researcher Widget -->
-  <div class="researcher-chat-widget">
-    <button class="chat-toggle-btn shadow" id="chatToggle">
-      <i class="bi bi-chat-dots me-2"></i> Chat with the Researcher
-    </button>
-    <div class="chat-panel" id="chatPanel" aria-live="polite">
-      <div class="chat-header">
-        <div>
-          <strong>Chat with the Researcher</strong>
-          <p class="mb-0" style="font-size: var(--text-xs); opacity: 0.9;">
-            Ask targeted questions about the publications below.
-          </p>
-        </div>
-        <button class="chat-close-btn" id="chatClose" aria-label="Close chat">&times;</button>
-      </div>
-      <div class="chat-body" id="chatMessages">
-        <div class="message assistant">
-          Hi! I can answer questions based on the publications you uploaded. Try asking “What are the latest findings on Covid-19?”
-        </div>
-      </div>
-      <div class="chat-footer">
-        <textarea id="chatInput" placeholder="Type your question..." aria-label="Chat message"></textarea>
-        <button type="button" id="chatSend">
-          <span class="default-label">Send</span>
-        </button>
-      </div>
-    </div>
-  </div>
+  {# Chat widget removed from faculty pages per UI cleanup requirements #}
 
   <!-- Premium Footer -->
   <footer>

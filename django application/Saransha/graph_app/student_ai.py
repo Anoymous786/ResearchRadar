@@ -20,6 +20,7 @@ import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
+from graph_app.groq_client import generate_ai_response
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1.  KEYWORD TAXONOMY
@@ -283,13 +284,24 @@ def _match_skills(text: str, index: List[Tuple[str, List[re.Pattern]]]) -> List[
 # ──────────────────────────────────────────────────────────────────────────────
 
 def extract_pdf_text(pdf_file) -> str:
-    """Extract text from a file-like PDF object."""
+    """Extract text from a file-like PDF object using PyMuPDF first."""
     try:
-        from PyPDF2 import PdfReader
-        pdf_file.seek(0)
-        reader = PdfReader(pdf_file)
-        pages = [page.extract_text() or "" for page in reader.pages]
-        text = "\n".join(pages)
+        text = ""
+        # Preferred parser: PyMuPDF (fitz) for better layout/text fidelity.
+        try:
+            import fitz  # PyMuPDF
+            pdf_file.seek(0)
+            pdf_bytes = pdf_file.read()
+            with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
+                pages = [page.get_text("text") or "" for page in doc]
+                text = "\n".join(pages)
+        except Exception:
+            # Fallback parser: PyPDF2
+            from PyPDF2 import PdfReader
+            pdf_file.seek(0)
+            reader = PdfReader(pdf_file)
+            pages = [page.extract_text() or "" for page in reader.pages]
+            text = "\n".join(pages)
 
         # Normalize common PDF text artifacts to make downstream regex/section parsing more accurate.
         # - join hyphenated line breaks: "machine-\nlearning" -> "machinelearning"
@@ -1024,6 +1036,31 @@ def extract_resume_fields(resume_text: str) -> Dict:
     email = _extract_email(text)
     sections = _split_sections(text)
 
+    certifications_text = sections.get("certifications", "")
+    certifications = []
+    if certifications_text:
+        for line in certifications_text.splitlines():
+            line = line.strip(" \t-•")
+            if len(line) >= 3:
+                certifications.append(line)
+    if not certifications:
+        # fallback: detect common certification lines anywhere in resume
+        for line in text.splitlines():
+            raw = line.strip()
+            low = raw.lower()
+            if (
+                len(raw) >= 5
+                and ("certified" in low or "certification" in low or "certificate" in low)
+            ):
+                certifications.append(raw)
+    dedup_certifications = []
+    seen_cert = set()
+    for cert in certifications:
+        key = cert.lower()
+        if key not in seen_cert:
+            seen_cert.add(key)
+            dedup_certifications.append(cert)
+
     return {
         "name":       _extract_name(text, email),
         "email":      email,
@@ -1036,6 +1073,7 @@ def extract_resume_fields(resume_text: str) -> Dict:
         "experience": sections.get("experience", ""),
         "interests":  sections.get("interests", ""),
         "summary":    sections.get("summary", ""),
+        "certifications": dedup_certifications,
     }
 
 
@@ -1245,6 +1283,161 @@ def rule_based_research_paper_analysis(paper_text: str) -> str:
 
 def analyze_research_paper_with_groq(paper_text: str) -> str:
     return rule_based_research_paper_analysis(paper_text)
+
+
+def _safe_list(value):
+    return value if isinstance(value, list) else []
+
+
+def _normalize_role_text(value: str) -> str:
+    return re.sub(r"[^a-z0-9\s]+", " ", (value or "").lower()).strip()
+
+
+ROLE_ALIAS_MAP: Dict[str, str] = {
+    "sde": "software engineer",
+    "software developer": "software engineer",
+    "full stack developer": "software engineer",
+    "fullstack developer": "software engineer",
+    "frontend engineer": "frontend developer",
+    "ui developer": "frontend developer",
+    "react developer": "frontend developer",
+    "web developer": "frontend developer",
+    "backend engineer": "backend developer",
+    "api developer": "backend developer",
+    "server side developer": "backend developer",
+    "ml engineer": "machine learning engineer",
+    "ai engineer": "machine learning engineer",
+    "deep learning engineer": "machine learning engineer",
+    "data analyst": "data scientist",
+    "business analyst": "data scientist",
+    "data engineering": "data engineer",
+    "etl developer": "data engineer",
+    "cloud engineer": "devops engineer",
+    "platform engineer": "devops engineer",
+    "site reliability engineer": "devops engineer",
+    "sre": "devops engineer",
+    "research intern": "research assistant",
+    "research engineer": "research assistant",
+    "product analyst": "data scientist",
+    "nlp engineer": "machine learning engineer",
+    "computer vision engineer": "machine learning engineer",
+}
+
+
+def resolve_target_role(target_role: str) -> str:
+    role = _normalize_role_text(target_role)
+    if not role:
+        return "software engineer"
+    if role in ROLE_PROFILES:
+        return role
+    if role in ROLE_ALIAS_MAP:
+        return ROLE_ALIAS_MAP[role]
+    for alias, canonical in ROLE_ALIAS_MAP.items():
+        if alias in role:
+            return canonical
+    for key in ROLE_PROFILES.keys():
+        if key in role:
+            return key
+    return "software engineer"
+
+
+def recommend_jobs_for_profile(skills: List[str], target_role: str = "") -> List[str]:
+    canonical = resolve_target_role(target_role)
+    role_profile = ROLE_PROFILES.get(canonical, ROLE_PROFILES["software engineer"])
+    base_jobs = [canonical.title(), "Graduate Trainee Engineer", "Internship - " + canonical.title()]
+    bonus_jobs = {
+        "software engineer": ["Backend Developer", "Full Stack Developer", "Platform Engineer"],
+        "frontend developer": ["UI Engineer", "React Developer", "Frontend Intern"],
+        "backend developer": ["API Engineer", "Python Backend Developer", "Microservices Developer"],
+        "data scientist": ["Data Analyst", "ML Analyst", "Business Intelligence Analyst"],
+        "machine learning engineer": ["AI Engineer", "NLP Engineer", "Computer Vision Engineer"],
+        "data engineer": ["ETL Engineer", "Analytics Engineer", "Cloud Data Engineer"],
+        "devops engineer": ["Cloud Engineer", "Site Reliability Engineer", "Infrastructure Engineer"],
+        "research assistant": ["Research Intern", "Research Associate", "Applied AI Researcher"],
+    }
+    jobs = base_jobs + bonus_jobs.get(canonical, [])
+    if any(x in [s.lower() for s in skills] for x in ["aws", "gcp", "azure", "docker"]):
+        jobs.append("Cloud Solutions Engineer")
+    if any(x in [s.lower() for s in skills] for x in ["pytorch", "tensorflow", "scikit-learn"]):
+        jobs.append("Machine Learning Engineer")
+    return jobs[:8]
+
+
+def build_improve_resume_feedback(extracted_details: Dict) -> Dict[str, List[str]]:
+    analysis = (extracted_details or {}).get("analysis", {}) or {}
+    missing = _safe_list(analysis.get("missing_skills", []))
+    tips = _safe_list(analysis.get("resume_tips", []))
+    wording = [
+        "Start bullet points with strong action verbs: built, improved, optimized, automated.",
+        "Add quantified impact to each major project or experience bullet.",
+        "Use role-relevant keywords naturally in skills and project descriptions.",
+    ]
+    ats_feedback = [
+        f"Current ATS score is {analysis.get('ats_score', 0)}/100.",
+        "Keep section headings clear: Summary, Skills, Projects, Experience, Education.",
+        "Ensure contact details and role intent are visible near the top.",
+    ]
+    improvement_points = tips[:4] if tips else [
+        "Add 2-3 measurable achievements with numbers.",
+        "Align profile summary with your target role and strengths.",
+        "Highlight domain projects with tech stack and outcomes.",
+    ]
+    return {
+        "missing_skills": missing[:10],
+        "wording_suggestions": wording,
+        "ats_feedback": ats_feedback,
+        "improvement_points": improvement_points,
+    }
+
+
+def generate_career_summary_payload(extracted_details: Dict, target_role: str = "") -> Dict:
+    extracted_details = extracted_details or {}
+    analysis = extracted_details.get("analysis", {}) or {}
+    personal = extracted_details.get("personal_info", {}) or {}
+    skills = _safe_list(extracted_details.get("skills", []))
+    canonical_role = resolve_target_role(target_role or str(analysis.get("predicted_role", "")))
+    missing_skills = _safe_list(analysis.get("missing_skills", []))
+    strengths = []
+    if skills:
+        strengths.append("Strong skill foundations in " + ", ".join(skills[:6]) + ".")
+    if extracted_details.get("projects"):
+        strengths.append("Project portfolio is present and supports practical readiness.")
+    if extracted_details.get("experience"):
+        strengths.append("Experience details are available and improve role fit confidence.")
+    if not strengths:
+        strengths.append("Core profile sections are available for role-fit analysis.")
+    role_fit_notes = [
+        f"Target role considered: {canonical_role.title()}.",
+        f"Current role fit estimate: {analysis.get('match_score', 0)}%.",
+        "Role fit can improve by adding missing target-role keywords and quantified outcomes.",
+    ]
+    improvement = build_improve_resume_feedback(extracted_details)
+    summary_text = (
+        f"{personal.get('name') or 'This candidate'} is positioned for {canonical_role.title()} roles "
+        f"with an ATS readiness score of {analysis.get('ats_score', 0)}/100."
+    )
+
+    ai_prompt = (
+        "Write a concise 3 sentence career summary.\n"
+        f"Target role: {canonical_role}\n"
+        f"Skills: {', '.join(skills[:10])}\n"
+        f"Missing skills: {', '.join(missing_skills[:8])}\n"
+        f"Current summary: {personal.get('summary', '')}"
+    )
+    ai_summary = generate_ai_response(ai_prompt, system_prompt="You are Talvyn, a concise career intelligence assistant.")
+    if ai_summary and not ai_summary.lower().startswith("error:"):
+        summary_text = ai_summary.strip()
+
+    return {
+        "target_role": canonical_role.title(),
+        "short_summary": summary_text,
+        "strengths": strengths[:6],
+        "missing_skills": missing_skills[:10],
+        "role_fit_notes": role_fit_notes,
+        "improvement_suggestions": improvement.get("improvement_points", []),
+        "recommended_jobs": recommend_jobs_for_profile(skills, canonical_role),
+        "improve_resume": improvement,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────

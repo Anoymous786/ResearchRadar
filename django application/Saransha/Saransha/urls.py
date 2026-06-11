@@ -14,7 +14,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('graph/', include('graph_app.urls')),
     path('signup/', views.signup, name="signup"),
-    path('logo/', views.logo_view, name='logout'),
+    # Clicking the logo should never log the user out.
+    path('logo/', views.logo_view, name='logo'),
+    # Explicit logout endpoint (session flush).
+    path('logout/', views.logout_view, name='logout'),
     path('cust/', views.cust_view, name='cust'),
     path('missVal/', views.missVal_view, name='missVal'),
     path('upload-redirect/', views.upload_redirect, name='upload_redirect'),
@@ -28,13 +31,24 @@ urlpatterns = [
     path('faculty/publication/delete/<int:pub_id>/', views.faculty_publication_delete, name='faculty_publication_delete'),
     path('faculty/student-approvals/', views.faculty_student_approvals, name='faculty_student_approvals'),
     path('chatbot/', views.chatbot, name='chatbot'),
+    path('chatbot/api/', views.chatbot_api, name='chatbot_api'),
+    path('chat/', views.chat_page, name='chat'),
+    path('messages/', views.messages_page, name='messages'),
+    path('api/messages/search-users/', views.search_users, name='search_users'),
+    path('api/messages/get-or-create-conversation/', views.get_or_create_conversation, name='get_or_create_conversation'),
+    path('api/messages/send/', views.send_message, name='send_message'),
+    path('api/messages/list/', views.get_messages, name='get_messages'),
+    path('api/messages/update-status/', views.update_message_status, name='update_message_status'),
 
     # =====================================================
     # Student module (resume + paper analyzers)
     # =====================================================
     path('student/dashboard/', views.student_dashboard, name='student_dashboard'),
+    path('student/profile/', views.student_profile, name='student_profile'),
     path('student/upload/', views.upload_resume, name='student_upload'),
     path('student/analyze/', views.generate_resume_analysis, name='student_analyze'),
+    path('student/resume-analyzer/', views.resume_analyzer_section, name='resume_analyzer_section'),
+    path('student/resume-analyzer/result/', views.student_resume_result, name='student_resume_result'),
     path('student/research/', views.research_paper_analysis, name='research_paper_analysis'),
 ]
 

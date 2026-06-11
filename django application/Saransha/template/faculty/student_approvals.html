@@ -6,21 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Student Approvals - ResearchRader</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="{% static 'styles.css' %}">
+  <link rel="stylesheet" href="{% static 'premium-design.css' %}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    body { background-color: #f8f9fa; }
-    .navbar { background: linear-gradient(90deg, rgb(112, 128, 144), rgb(192, 192, 192)); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-    .navbar-brand { font-weight: bold; font-size: 1.75rem; color: white; }
-    .navbar-nav .nav-link { font-weight: bold; font-size: 1.1rem; padding: 0px 7px; color: white; }
-    .navbar-nav .nav-link:hover { color: #d4d4d4; }
+    body { background: var(--color-surface); }
   </style>
 </head>
 <body>
   <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg navbar-dark">
+  <nav class="navbar navbar-expand-lg">
     <div class="container p-1">
-      <a class="navbar-brand" href="#"><i class="bi bi-file-ppt-fill"></i>&nbsp;&nbsp;ResearchRader</a>
+      <a class="navbar-brand" href="{% url 'home' %}"><i class="bi bi-file-ppt-fill"></i><span>ResearchRadar</span></a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -28,12 +24,12 @@
         <ul class="navbar-nav ms-auto">
           <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'upload' %}">Upload</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'generatesummary' %}">Generate Summary</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'settings' %}">Settings</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'faculty_student_approvals' %}"><i class="bi bi-clipboard-check me-1"></i>Student Approvals</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}">Profile</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">logout</a></li>
+          <li class="nav-item"><a class="nav-link active" href="{% url 'faculty_student_approvals' %}">Student Approvals</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
         </ul>
       </div>
     </div>

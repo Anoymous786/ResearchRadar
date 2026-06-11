@@ -72,4 +72,10 @@ websocket-client==1.8.0
 wrapt==1.16.0
 wsproto==1.2.0
 google-generativeai
+PyMuPDF
 PyPDF2==3.0.1
+dj-database-url
+psycopg2-binary
+supabase
+python-docx
+groq

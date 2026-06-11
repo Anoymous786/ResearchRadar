@@ -47,13 +47,13 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="{% url 'student_dashboard' %}">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'student_upload' %}">Upload</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'student_profile' %}">Profile</a></li>
           <li class="nav-item"><a class="nav-link active" href="{% url 'student_analyze' %}">Generate Summary</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'student_dashboard' %}">Profile</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'settings' %}">Settings</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">logout</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
         </ul>
       </div>
     </div>
@@ -67,11 +67,19 @@
       </div>
     </div>
   {% endif %}
+  {% if success_message %}
+    <div class="container mt-3">
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>Success:</strong> {{ success_message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </div>
+  {% endif %}
 
   <div class="profile-header">
     <div class="container">
-      <h2 class="mb-0"><i class="bi bi-graph-up me-2"></i> Analysis Output</h2>
-      <p class="mb-0 mt-2 opacity-75">Resume ATS + Job Match plus optional research paper analysis.</p>
+      <h2 class="mb-0"><i class="bi bi-graph-up me-2"></i> Generate Summary</h2>
+      <p class="mb-0 mt-2 opacity-75">Extracted details, parsed profile insights, and AI recommendations in one view.</p>
     </div>
   </div>
 
@@ -96,7 +104,7 @@
               </div>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-lg w-100">
+            <button type="submit" class="btn btn-primary btn-lg w-100" id="generateSummaryBtn">
               <i class="bi bi-magic me-2"></i> Generate AI Analysis
             </button>
           </form>
@@ -106,7 +114,7 @@
       <div class="col-lg-7">
         {% if resume_analysis_json %}
           <div class="section-card mb-4">
-            <h4 class="mb-3"><i class="bi bi-file-earmark-text me-2"></i> Resume Analyzer</h4>
+            <h4 class="mb-3"><i class="bi bi-file-earmark-text me-2"></i> AI Summary and Resume Analysis</h4>
 
             <div class="mb-3">
               <div class="muted mb-1 fw-semibold">Resume Score (0–100)</div>
@@ -241,36 +249,158 @@
           </div>
         {% endif %}
 
-        {% if resume_fields %}
+        {% if extracted_details %}
           <div class="section-card">
-            <h4 class="mb-3"><i class="bi bi-list-check me-2"></i> Resume Sections Extracted</h4>
-
-            <div class="mb-3">
-              <h5 class="mb-1">Education</h5>
-              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.education|default:"-" }}</div>
-            </div>
-
-            <div class="mb-3">
-              <h5 class="mb-1">Skills</h5>
-              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.skills|default:"-" }}</div>
-            </div>
-
-            <div class="mb-3">
-              <h5 class="mb-1">Projects</h5>
-              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.projects|default:"-" }}</div>
-            </div>
-
-            <div class="mb-0">
-              <h5 class="mb-1">Experience</h5>
-              <div class="text-muted" style="white-space: pre-wrap; word-wrap: break-word;">{{ resume_fields.experience|default:"-" }}</div>
+            <h4 class="mb-3"><i class="bi bi-list-check me-2"></i> Extracted Resume Details</h4>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <h5 class="mb-1">Skills</h5>
+                <div class="d-flex flex-wrap gap-2">{% for skill in extracted_details.skills %}<span class="badge bg-primary-subtle text-primary">{{ skill }}</span>{% empty %}<span class="text-muted">No skills found.</span>{% endfor %}</div>
+              </div>
+              <div class="col-md-6">
+                <h5 class="mb-1">Interests</h5>
+                <div class="d-flex flex-wrap gap-2">{% for item in extracted_details.interests %}<span class="badge bg-info-subtle text-info">{{ item }}</span>{% empty %}<span class="text-muted">No interests found.</span>{% endfor %}</div>
+              </div>
+              <div class="col-md-6">
+                <h5 class="mb-1">Education</h5>
+                {% for item in extracted_details.education %}<div class="mb-2 text-muted">{{ item }}</div>{% empty %}<div class="text-muted">No education details found.</div>{% endfor %}
+              </div>
+              <div class="col-md-6">
+                <h5 class="mb-1">Experience</h5>
+                {% for item in extracted_details.experience %}<div class="mb-2 text-muted">{{ item }}</div>{% empty %}<div class="text-muted">No experience entries found.</div>{% endfor %}
+              </div>
+              <div class="col-12">
+                <h5 class="mb-2">Projects</h5>
+                <div class="row g-2">
+                  {% for project in extracted_details.projects %}
+                    <div class="col-md-6">
+                      <div class="border rounded p-3 h-100">
+                        <div class="fw-semibold">{{ project.title }}</div>
+                        <div class="small text-muted mb-2">{{ project.description|default:"No description available." }}</div>
+                        <div class="d-flex flex-wrap gap-2 mb-2">{% for tech in project.tech_stack %}<span class="badge bg-secondary-subtle text-secondary">{{ tech }}</span>{% empty %}<span class="small text-muted">No tech stack listed.</span>{% endfor %}</div>
+                        {% if project.links %}
+                          <div class="small">{% for link in project.links %}<a href="{{ link }}" target="_blank" rel="noopener noreferrer">Link {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}{% endfor %}</div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% empty %}
+                    <div class="col-12 text-muted">No projects found.</div>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="col-12">
+                <h5 class="mb-1">Certifications</h5>
+                <ul class="mb-0">{% for cert in extracted_details.certifications %}<li>{{ cert }}</li>{% empty %}<li class="text-muted">No certifications available.</li>{% endfor %}</ul>
+              </div>
             </div>
           </div>
         {% endif %}
 
+        {% if career_summary_payload %}
+          <div class="section-card mt-4">
+            <h4 class="mb-3"><i class="bi bi-stars me-2"></i>Career Intelligence Summary</h4>
+            <div class="mb-2"><strong>Target Role:</strong> {{ career_summary_payload.target_role }}</div>
+            <p class="text-muted">{{ career_summary_payload.short_summary }}</p>
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <h6>Strengths</h6>
+                <ul class="mb-0">{% for item in career_summary_payload.strengths %}<li>{{ item }}</li>{% empty %}<li class="text-muted">No strengths available.</li>{% endfor %}</ul>
+              </div>
+              <div class="col-md-6">
+                <h6>Missing Skills</h6>
+                <div class="d-flex flex-wrap gap-2">{% for skill in career_summary_payload.missing_skills %}<span class="badge bg-danger-subtle text-danger">{{ skill }}</span>{% empty %}<span class="text-muted">No major skill gaps.</span>{% endfor %}</div>
+              </div>
+              <div class="col-md-6">
+                <h6>Role Fit Notes</h6>
+                <ul class="mb-0">{% for note in career_summary_payload.role_fit_notes %}<li>{{ note }}</li>{% empty %}<li class="text-muted">No notes yet.</li>{% endfor %}</ul>
+              </div>
+              <div class="col-md-6">
+                <h6>Improvement Suggestions</h6>
+                <ul class="mb-0">{% for tip in career_summary_payload.improvement_suggestions %}<li>{{ tip }}</li>{% empty %}<li class="text-muted">No suggestions yet.</li>{% endfor %}</ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card mt-4">
+            <h4 class="mb-3"><i class="bi bi-briefcase me-2"></i>Jobs You Can Target</h4>
+            <div class="d-flex flex-wrap gap-2">{% for role in career_summary_payload.recommended_jobs %}<span class="badge bg-primary-subtle text-primary">{{ role }}</span>{% empty %}<span class="text-muted">No job recommendations available.</span>{% endfor %}</div>
+          </div>
+
+          <div class="section-card mt-4">
+            <h4 class="mb-3"><i class="bi bi-file-earmark-check me-2"></i>Improve My Resume</h4>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <h6>Wording Suggestions</h6>
+                <ul class="mb-0">{% for line in career_summary_payload.improve_resume.wording_suggestions %}<li>{{ line }}</li>{% empty %}<li class="text-muted">No wording suggestions.</li>{% endfor %}</ul>
+              </div>
+              <div class="col-md-6">
+                <h6>ATS Feedback</h6>
+                <ul class="mb-0">{% for line in career_summary_payload.improve_resume.ats_feedback %}<li>{{ line }}</li>{% empty %}<li class="text-muted">No ATS feedback.</li>{% endfor %}</ul>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="section-card mt-4">
+          <h4 class="mb-3"><i class="bi bi-person-badge me-2"></i> Parsed Profile Information</h4>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <h6 class="mb-2">Projects</h6>
+              {% for project in section_data.projects %}
+                <div class="border rounded p-2 mb-2 bg-light">
+                  <div class="fw-semibold">{{ project.name|default:"Project" }}</div>
+                  <div class="small text-muted">{{ project.role|default:"No description added." }}</div>
+                </div>
+              {% empty %}
+                <div class="text-muted">No project entries available.</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <h6 class="mb-2">Education</h6>
+              {% for item in section_data.education %}
+                <div class="border rounded p-2 mb-2 bg-light">
+                  <div class="fw-semibold">{{ item.degree|default:"Degree" }}</div>
+                  <div class="small text-muted">{{ item.institute|default:"Institute" }}</div>
+                </div>
+              {% empty %}
+                <div class="text-muted">No education entries available.</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <h6 class="mb-2">Experience</h6>
+              {% for item in section_data.experience %}
+                <div class="border rounded p-2 mb-2 bg-light">
+                  <div class="fw-semibold">{{ item.title|default:"Role" }}</div>
+                  <div class="small text-muted">{{ item.organization|default:"Organization" }}</div>
+                </div>
+              {% empty %}
+                <div class="text-muted">No experience entries available.</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <h6 class="mb-2">Certifications and Interests</h6>
+              <div class="mb-2">
+                {% for item in section_data.certifications %}
+                  <span class="badge bg-primary-subtle text-primary me-1 mb-1">{{ item.name|default:item }}</span>
+                {% empty %}
+                  <span class="text-muted">No certifications available.</span>
+                {% endfor %}
+              </div>
+              <div>
+                {% for item in section_data.interests %}
+                  <span class="badge bg-info-subtle text-info me-1 mb-1">{{ item }}</span>
+                {% empty %}
+                  <span class="text-muted">No interests available.</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {% if paper_analysis_output %}
           <div class="section-card">
             <h4 class="mb-3"><i class="bi bi-journal-text me-2"></i> Research Paper Analyzer (Bonus)</h4>
-            <pre class="analysis">{{ paper_analysis_output }}</pre>
+            <p class="text-muted mb-0">Research paper analysis is available and has been processed for this resume session.</p>
           </div>
         {% endif %}
 
@@ -286,6 +416,16 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const generateBtn = document.getElementById("generateSummaryBtn");
+    if (generateBtn) {
+      const form = generateBtn.closest("form");
+      form.addEventListener("submit", () => {
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+      });
+    }
+  </script>
 </body>
 </html>
 

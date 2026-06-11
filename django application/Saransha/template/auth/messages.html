@@ -1,0 +1,543 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages - ResearchRadar</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'student_dashboard.css' %}">
+  <style>
+    .msg-wrap{height:calc(100vh - 86px);padding:1rem 0;}
+    .msg-shell{height:100%;display:grid;grid-template-columns:320px 1fr;gap:1rem;}
+    .msg-panel{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 6px 18px rgba(28,39,64,.06);}
+    .msg-left{padding:.9rem;display:flex;flex-direction:column;height:100%;}
+    .msg-list{flex:1;overflow:auto;margin-top:.65rem;}
+    .person-item{border:1px solid #ebeff6;border-radius:10px;padding:.65rem .75rem;cursor:pointer;margin-bottom:.5rem;}
+    .person-item.active,.person-item:hover{background:#f2f6ff;border-color:#dbe6ff;}
+    .person-meta{font-size:.8rem;color:#64748b;}
+    .msg-right{display:flex;flex-direction:column;height:100%;}
+    .msg-head{padding:.9rem 1rem;border-bottom:1px solid #edf2f7;}
+    .msg-body{flex:1;overflow:auto;padding:1rem;background:#f8fafd;}
+    .msg-row{display:flex;margin-bottom:.7rem;}
+    .msg-row.sent{justify-content:flex-end;}
+    .msg-bubble{max-width:72%;padding:.62rem .82rem;border-radius:12px;white-space:pre-wrap;}
+    .msg-row.sent .msg-bubble{background:#4465d5;color:#fff;}
+    .msg-row.recv .msg-bubble{background:#fff;border:1px solid #e5eaf2;}
+    .msg-input{display:flex;gap:.6rem;padding:.85rem;border-top:1px solid #edf2f7;background:#fff;border-radius:0 0 14px 14px;}
+    .typing-indicator{font-size:.82rem;color:#64748b;padding:0 1rem .5rem;display:none;}
+    @media (max-width: 920px){.msg-shell{grid-template-columns:1fr;}.msg-left{max-height:280px;}}
+  </style>
+</head>
+<body class="rr-bg">
+  <nav class="navbar navbar-expand-lg sticky-top rr-nav">
+    <div class="container">
+      <a class="navbar-brand rr-brand" href="{% url 'home' %}"><i class="bi bi-file-ppt-fill me-2"></i>ResearchRadar</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#messagesNav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="messagesNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+          {% if is_faculty %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'upload' %}">Upload</a></li>
+          {% else %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'student_upload' %}">Upload</a></li>
+          {% endif %}
+          <li class="nav-item">
+            <a class="nav-link active" href="{% url 'messages' %}">
+              Messages <span class="badge rounded-pill bg-danger ms-1" id="msgUnreadBadge" style="display:none;">0</span>
+            </a>
+          </li>
+          {% if is_faculty %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}">Profile</a></li>
+          {% else %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'student_profile' %}">Profile</a></li>
+          {% endif %}
+          <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container msg-wrap">
+    <div class="msg-shell">
+      <aside class="msg-panel msg-left">
+        <input id="userSearch" class="form-control" placeholder="Search by name or email">
+        <div class="msg-list" id="userList"></div>
+      </aside>
+
+      <section class="msg-panel msg-right">
+        <div class="msg-head">
+          <div class="fw-semibold" id="chatTitle">Select a user to start chatting</div>
+          <div class="text-muted small" id="chatStatus">Offline</div>
+        </div>
+        <div class="msg-body" id="msgBody">
+          <div class="text-center text-muted mt-4">Search and click a user to load messages.</div>
+        </div>
+        <div class="typing-indicator" id="typingIndicator">Sending...</div>
+        <div class="msg-input">
+          <input id="msgInput" class="form-control" placeholder="Type your message..." autocomplete="off">
+          <button id="sendBtn" class="btn btn-primary"><i class="bi bi-send"></i></button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    const meId = "{{ current_user_id }}";
+    const SUPABASE_URL = "{{ supabase_url|escapejs }}";
+    const SUPABASE_ANON_KEY = "{{ supabase_anon_key|escapejs }}";
+    const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          realtime: { params: { eventsPerSecond: 20 } },
+        })
+      : null;
+
+    const userSearch = document.getElementById("userSearch");
+    const userList = document.getElementById("userList");
+    const msgBody = document.getElementById("msgBody");
+    const msgInput = document.getElementById("msgInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const chatTitle = document.getElementById("chatTitle");
+    const chatStatus = document.getElementById("chatStatus");
+    const typingIndicator = document.getElementById("typingIndicator");
+    let selectedUser = null;
+    let conversationId = null;
+    let realtimeChannel = null;
+    let isFetchingOlder = false;
+    let hasMore = true;
+    let nextBefore = null;
+
+    const convoCache = new Map(); // conversationId -> { order: [], byId: Map(), oldestCreatedAt: string|null }
+
+    function esc(text) {
+      const div = document.createElement("div");
+      div.textContent = text || "";
+      return div.innerHTML;
+    }
+
+    function nowIso() {
+      return new Date().toISOString();
+    }
+
+    function scrollToBottom() {
+      msgBody.scrollTop = msgBody.scrollHeight;
+    }
+
+    function getConvoState(cid) {
+      if (!convoCache.has(cid)) {
+        convoCache.set(cid, { order: [], byId: new Map(), oldestCreatedAt: null });
+      }
+      return convoCache.get(cid);
+    }
+
+    function messageSortKey(m) {
+      const t = m.created_at || "";
+      const id = m.id || "";
+      return `${t}::${id}`;
+    }
+
+    function ensureMessageInState(cid, msg) {
+      const state = getConvoState(cid);
+      const id = String(msg.id || "").trim();
+      if (!id) return { inserted: false, updated: false };
+
+      const existing = state.byId.get(id);
+      if (existing) {
+        const merged = { ...existing, ...msg };
+        state.byId.set(id, merged);
+        return { inserted: false, updated: true };
+      }
+
+      state.byId.set(id, msg);
+      state.order.push(id);
+      state.order.sort((a, b) => {
+        const ma = state.byId.get(a);
+        const mb = state.byId.get(b);
+        const ka = messageSortKey(ma || {});
+        const kb = messageSortKey(mb || {});
+        return ka.localeCompare(kb);
+      });
+
+      const createdAt = msg.created_at || null;
+      if (createdAt && (!state.oldestCreatedAt || createdAt < state.oldestCreatedAt)) {
+        state.oldestCreatedAt = createdAt;
+      }
+      return { inserted: true, updated: false };
+    }
+
+    function buildMessageEl(m) {
+      const row = document.createElement("div");
+      row.className = `msg-row ${m.is_me ? "sent" : "recv"}`;
+      row.dataset.id = m.id;
+      row.dataset.createdAt = m.created_at || "";
+
+      const bubble = document.createElement("div");
+      bubble.className = "msg-bubble";
+      bubble.innerHTML = esc(m.content);
+
+      if (m.is_me) {
+        const meta = document.createElement("div");
+        meta.style.fontSize = ".72rem";
+        meta.style.opacity = ".85";
+        meta.style.marginTop = ".25rem";
+        meta.style.textAlign = "right";
+        meta.textContent = (m.status === "sending") ? "Sending…" : (m.status === "delivered" ? "Delivered" : (m.status === "seen" ? "Seen" : "Sent"));
+        bubble.appendChild(document.createElement("br"));
+        bubble.appendChild(meta);
+      }
+
+      row.appendChild(bubble);
+      return row;
+    }
+
+    function upsertMessageDom(m, { scrollIfAtBottom = false } = {}) {
+      const existing = msgBody.querySelector(`.msg-row[data-id="${CSS.escape(String(m.id))}"]`);
+      const atBottom = (msgBody.scrollHeight - msgBody.scrollTop - msgBody.clientHeight) < 24;
+      if (existing) {
+        existing.className = `msg-row ${m.is_me ? "sent" : "recv"}`;
+        existing.dataset.createdAt = m.created_at || "";
+        const bubble = existing.querySelector(".msg-bubble");
+        if (bubble) {
+          bubble.innerHTML = esc(m.content);
+          if (m.is_me) {
+            const meta = document.createElement("div");
+            meta.style.fontSize = ".72rem";
+            meta.style.opacity = ".85";
+            meta.style.marginTop = ".25rem";
+            meta.style.textAlign = "right";
+            meta.textContent = (m.status === "sending") ? "Sending…" : (m.status === "delivered" ? "Delivered" : (m.status === "seen" ? "Seen" : "Sent"));
+            bubble.appendChild(document.createElement("br"));
+            bubble.appendChild(meta);
+          }
+        }
+      } else {
+        const el = buildMessageEl(m);
+        msgBody.appendChild(el);
+      }
+      if (scrollIfAtBottom && atBottom) scrollToBottom();
+    }
+
+    function renderFromState(cid, { keepScroll = false } = {}) {
+      const state = getConvoState(cid);
+      const prevScrollHeight = msgBody.scrollHeight;
+      const prevScrollTop = msgBody.scrollTop;
+
+      msgBody.innerHTML = "";
+      if (!state.order.length) {
+        msgBody.innerHTML = '<div class="text-center text-muted mt-4">No messages yet. Start the conversation.</div>';
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      for (const id of state.order) {
+        const m = state.byId.get(id);
+        if (!m) continue;
+        frag.appendChild(buildMessageEl(m));
+      }
+      msgBody.appendChild(frag);
+
+      if (keepScroll) {
+        const delta = msgBody.scrollHeight - prevScrollHeight;
+        msgBody.scrollTop = prevScrollTop + delta;
+      } else {
+        scrollToBottom();
+      }
+    }
+
+    async function searchUsers(query = "") {
+      const resp = await fetch(`/api/messages/search-users/?q=${encodeURIComponent(query)}`);
+      const data = await resp.json();
+      userList.innerHTML = (data.results || []).map((u) => `
+        <div class="person-item" data-id="${u.id}" data-name="${esc(u.name)}" data-role="${esc(u.role)}">
+          <div class="fw-semibold">${esc(u.name)}</div>
+          <div class="person-meta">${esc(u.email)} - ${esc(u.role)}</div>
+        </div>
+      `).join("") || '<div class="text-muted small">No users found.</div>';
+    }
+
+    function assertSupabaseReady() {
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !supabase) {
+        msgBody.innerHTML = `<div class="text-danger">
+          Supabase client is not configured. Set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> in <code>.env</code>.
+        </div>`;
+        return false;
+      }
+      return true;
+    }
+
+    async function teardownRealtime() {
+      if (realtimeChannel && supabase) {
+        try { await supabase.removeChannel(realtimeChannel); } catch (_) {}
+      }
+      realtimeChannel = null;
+    }
+
+    async function setupRealtime(cid) {
+      await teardownRealtime();
+      if (!supabase || !cid) return;
+      realtimeChannel = supabase
+        .channel(`conversation:${cid}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${cid}` },
+          (payload) => {
+            console.log("[realtime] INSERT", payload);
+            const row = payload.new || {};
+            const senderId = row.sender_id || row.from_user_id || row.user_id;
+            const msg = {
+              id: row.id,
+              conversation_id: row.conversation_id,
+              sender_id: senderId,
+              content: row.content || row.message || row.text || row.body || "",
+              created_at: row.created_at || row.sent_at || row.timestamp || row.updated_at || nowIso(),
+              status: row.status || "sent",
+            };
+
+            msg.is_me = String(senderId) === String(meId);
+
+            ensureMessageInState(cid, msg);
+            if (conversationId === cid) {
+              upsertMessageDom(msg, { scrollIfAtBottom: true });
+              // Status updates are handled client-side (no Django in hot path).
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "messages", filter: `conversation_id=eq.${cid}` },
+          (payload) => {
+            console.log("[realtime] UPDATE", payload);
+            const row = payload.new || {};
+            const senderId = row.sender_id || row.from_user_id || row.user_id;
+            const msg = {
+              id: row.id,
+              conversation_id: row.conversation_id,
+              sender_id: senderId,
+              content: row.content || row.message || row.text || row.body || "",
+              created_at: row.created_at || row.sent_at || row.timestamp || row.updated_at || nowIso(),
+              is_me: String(senderId) === String(meId),
+              status: row.status || "sent",
+            };
+            ensureMessageInState(cid, msg);
+            if (conversationId === cid) upsertMessageDom(msg, { scrollIfAtBottom: false });
+          }
+        )
+        .subscribe((status) => console.log("[realtime] channel status", status));
+    }
+
+    function normalizePair(a, b) {
+      const as = String(a);
+      const bs = String(b);
+      return as < bs ? [as, bs] : [bs, as];
+    }
+
+    async function getOrCreateConversationSupabase(otherUserId) {
+      const [u1, u2] = normalizePair(meId, otherUserId);
+
+      const existing = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("user1_id", u1)
+        .eq("user2_id", u2)
+        .limit(1)
+        .maybeSingle();
+
+      if (existing.error) throw existing.error;
+      if (existing.data) return existing.data;
+
+      const created = await supabase
+        .from("conversations")
+        .insert({ user1_id: u1, user2_id: u2 })
+        .select("*")
+        .single();
+
+      if (created.error) throw created.error;
+      return created.data;
+    }
+
+    async function openConversation(userId, userName, roleLabel) {
+      if (!assertSupabaseReady()) return;
+      selectedUser = { id: userId, name: userName };
+      chatTitle.textContent = userName;
+      chatStatus.textContent = `Role: ${roleLabel} | Last seen: just now`;
+      typingIndicator.style.display = "none";
+
+      try {
+        const conv = await getOrCreateConversationSupabase(userId);
+        conversationId = conv.id;
+      } catch (e) {
+        msgBody.innerHTML = `<div class="text-danger">${esc(e?.message || "Unable to open conversation.")}</div>`;
+        return;
+      }
+
+      hasMore = true;
+      nextBefore = null;
+      await loadInitialMessages();
+      await setupRealtime(conversationId);
+    }
+
+    async function loadInitialMessages() {
+      if (!conversationId) return;
+      const result = await supabase
+        .from("messages")
+        .select("id,conversation_id,sender_id,content,created_at,status")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (result.error) return;
+
+      const state = getConvoState(conversationId);
+      state.order = [];
+      state.byId = new Map();
+      state.oldestCreatedAt = null;
+      const rows = (result.data || []).slice().reverse();
+      for (const row of rows) {
+        const msg = {
+          id: row.id,
+          conversation_id: row.conversation_id,
+          sender_id: row.sender_id,
+          content: row.content,
+          created_at: row.created_at,
+          status: row.status || "sent",
+          is_me: String(row.sender_id) === String(meId),
+        };
+        ensureMessageInState(conversationId, msg);
+      }
+      nextBefore = state.oldestCreatedAt || null;
+      hasMore = Boolean(nextBefore) && rows.length >= 20;
+      renderFromState(conversationId, { keepScroll: false });
+    }
+
+    async function loadOlderMessages() {
+      if (!conversationId || isFetchingOlder || !hasMore || !nextBefore) return;
+      isFetchingOlder = true;
+      const before = nextBefore;
+      try {
+        const result = await supabase
+          .from("messages")
+          .select("id,conversation_id,sender_id,content,created_at,status")
+          .eq("conversation_id", conversationId)
+          .lt("created_at", before)
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (result.error) return;
+        const incomingRows = (result.data || []);
+        const incoming = incomingRows.slice().reverse().map((row) => ({
+          id: row.id,
+          conversation_id: row.conversation_id,
+          sender_id: row.sender_id,
+          content: row.content,
+          created_at: row.created_at,
+          status: row.status || "sent",
+          is_me: String(row.sender_id) === String(meId),
+        }));
+
+        if (!incoming.length) {
+          hasMore = false;
+          return;
+        }
+
+        // Prepend without flicker: merge into state then rerender while keeping scroll anchored.
+        for (const m of incoming) ensureMessageInState(conversationId, m);
+        const state = getConvoState(conversationId);
+        nextBefore = state.oldestCreatedAt || nextBefore;
+        hasMore = Boolean(nextBefore) && incoming.length >= 20;
+        renderFromState(conversationId, { keepScroll: true });
+      } finally {
+        isFetchingOlder = false;
+      }
+    }
+
+    async function updateStatus(ids, status) {
+      if (!ids || !ids.length || !conversationId) return;
+      await supabase
+        .from("messages")
+        .update({ status })
+        .eq("conversation_id", conversationId)
+        .in("id", ids);
+    }
+
+    async function sendMessage() {
+      const content = (msgInput.value || "").trim();
+      if (!content || !conversationId) return;
+      const clientId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+
+      // Optimistic insert (instant UI)
+      const optimistic = {
+        id: clientId,
+        conversation_id: conversationId,
+        sender_id: String(meId),
+        content,
+        created_at: nowIso(),
+        is_me: true,
+        status: "sending",
+      };
+      ensureMessageInState(conversationId, optimistic);
+      upsertMessageDom(optimistic, { scrollIfAtBottom: true });
+
+      msgInput.value = "";
+
+      const inserted = await supabase
+        .from("messages")
+        .insert({
+          id: clientId,
+          conversation_id: conversationId,
+          sender_id: String(meId),
+          content,
+          status: "sent",
+        })
+        .select("id,conversation_id,sender_id,content,created_at,status")
+        .single();
+
+      if (inserted.error) {
+        const state = getConvoState(conversationId);
+        const failed = state.byId.get(clientId);
+        if (failed) {
+          failed.status = "sent";
+          ensureMessageInState(conversationId, failed);
+          upsertMessageDom(failed, { scrollIfAtBottom: false });
+        }
+        console.log("[send] insert failed", inserted.error);
+        return;
+      }
+
+      const row = inserted.data;
+      const serverMsg = {
+        id: row.id,
+        conversation_id: row.conversation_id,
+        sender_id: row.sender_id,
+        content: row.content,
+        created_at: row.created_at,
+        status: row.status || "sent",
+        is_me: true,
+      };
+      ensureMessageInState(conversationId, serverMsg);
+      upsertMessageDom(serverMsg, { scrollIfAtBottom: true });
+    }
+
+    userSearch.addEventListener("input", (e) => searchUsers(e.target.value));
+    userList.addEventListener("click", (e) => {
+      const row = e.target.closest(".person-item");
+      if (!row) return;
+      document.querySelectorAll(".person-item").forEach((el) => el.classList.remove("active"));
+      row.classList.add("active");
+      openConversation(row.dataset.id, row.dataset.name, row.dataset.role);
+    });
+    sendBtn.addEventListener("click", sendMessage);
+    msgInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    msgBody.addEventListener("scroll", () => {
+      if (msgBody.scrollTop < 24) loadOlderMessages();
+    });
+
+    searchUsers();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

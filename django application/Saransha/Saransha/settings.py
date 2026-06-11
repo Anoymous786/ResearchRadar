@@ -11,17 +11,32 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
-import os
-
-load_dotenv()
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+def get_required_env(var_name: str) -> str:
+    value = os.environ.get(var_name, "").strip()
+    if not value:
+        raise ImproperlyConfigured(
+            f"Missing required environment variable '{var_name}'. "
+            "Create/update the .env file before starting Django."
+        )
+    return value
+
+
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-7(q%q^(8!9i)z0a*f$s!y4hoe=@zg1bxb!)ph4r(c=1$q+^9uj'
@@ -78,15 +93,51 @@ WSGI_APPLICATION = 'Saransha.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+USE_REMOTE_DB = env_flag("USE_REMOTE_DB", default=False)
+DEFAULT_DB_ENGINE = (
+    "django.db.backends.postgresql" if USE_REMOTE_DB else "django.db.backends.sqlite3"
+)
+DB_ENGINE = os.environ.get("DB_ENGINE", DEFAULT_DB_ENGINE).strip() or DEFAULT_DB_ENGINE
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if (not USE_REMOTE_DB) or DB_ENGINE == "django.db.backends.sqlite3":
+    sqlite_name = os.environ.get("DB_NAME", "db.sqlite3").strip() or "db.sqlite3"
+    sqlite_path = sqlite_name if os.path.isabs(sqlite_name) else BASE_DIR / sqlite_name
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": sqlite_path,
+        }
     }
-}
+else:
+    # Prefer a single DATABASE_URL if provided (works well with Supabase pooler).
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    conn_max_age = int(os.environ.get("DB_CONN_MAX_AGE", "600") or "600")
 
+    if database_url:
+        DATABASES = {
+            "default": dj_database_url.parse(database_url, conn_max_age=conn_max_age)
+        }
+    else:
+        # Fallback to discrete vars.
+        db_name = os.environ.get("DB_NAME", "postgres").strip() or "postgres"
+        db_user = get_required_env("DB_USER")
+        db_password = get_required_env("DB_PASSWORD")
+        db_host = get_required_env("DB_HOST")
+        db_port = os.environ.get("DB_PORT", "5432").strip() or "5432"
+        db_sslmode = os.environ.get("DB_SSLMODE", "require").strip() or "require"
 
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": db_name,
+                "USER": db_user,
+                "PASSWORD": db_password,
+                "HOST": db_host,
+                "PORT": db_port,
+                "OPTIONS": {"sslmode": db_sslmode},
+                "CONN_MAX_AGE": conn_max_age,
+            }
+        }
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 

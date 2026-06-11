@@ -1,419 +1,220 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Research Assistant - Chatbot</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .chatbot-container {
-            width: 100%;
-            max-width: 900px;
-            height: 85vh;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .chatbot-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 25px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .chatbot-header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .chatbot-header h1 i {
-            font-size: 28px;
-        }
-
-        .back-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.3s;
-        }
-
-        .back-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-
-        .chatbot-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 30px;
-            background: #f8f9fa;
-        }
-
-        .message {
-            margin-bottom: 20px;
-            display: flex;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .message.user {
-            justify-content: flex-end;
-        }
-
-        .message.assistant {
-            justify-content: flex-start;
-        }
-
-        .message-bubble {
-            max-width: 70%;
-            padding: 15px 20px;
-            border-radius: 18px;
-            word-wrap: break-word;
-            line-height: 1.5;
-        }
-
-        .message.user .message-bubble {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-bottom-right-radius: 4px;
-        }
-
-        .message.assistant .message-bubble {
-            background: white;
-            color: #333;
-            border: 1px solid #e0e0e0;
-            border-bottom-left-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        .message.error .message-bubble {
-            background: #fee;
-            color: #c33;
-            border: 1px solid #fcc;
-        }
-
-        .typing-indicator {
-            display: flex;
-            gap: 5px;
-            padding: 15px 20px;
-        }
-
-        .typing-indicator span {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #667eea;
-            animation: typing 1.4s infinite;
-        }
-
-        .typing-indicator span:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .typing-indicator span:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-
-        @keyframes typing {
-            0%, 60%, 100% {
-                transform: translateY(0);
-                opacity: 0.7;
-            }
-            30% {
-                transform: translateY(-10px);
-                opacity: 1;
-            }
-        }
-
-        .chatbot-input-area {
-            padding: 25px 30px;
-            background: white;
-            border-top: 1px solid #e0e0e0;
-        }
-
-        .input-group {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .input-group input {
-            flex: 1;
-            padding: 15px 20px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 16px;
-            outline: none;
-            transition: all 0.3s;
-        }
-
-        .input-group input:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .send-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-            padding: 15px 30px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .send-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .send-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .welcome-message {
-            text-align: center;
-            padding: 40px 20px;
-            color: #666;
-        }
-
-        .welcome-message i {
-            font-size: 64px;
-            color: #667eea;
-            margin-bottom: 20px;
-        }
-
-        .welcome-message h2 {
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .welcome-message p {
-            color: #888;
-            font-size: 16px;
-        }
-
-        .citations {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #e0e0e0;
-            font-size: 12px;
-            color: #666;
-        }
-
-        .citations strong {
-            color: #667eea;
-        }
-
-        /* Scrollbar styling */
-        .chatbot-messages::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .chatbot-messages::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-
-        .chatbot-messages::-webkit-scrollbar-thumb {
-            background: #667eea;
-            border-radius: 4px;
-        }
-
-        .chatbot-messages::-webkit-scrollbar-thumb:hover {
-            background: #764ba2;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talvyn - ResearchRadar</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'student_dashboard.css' %}">
+  <style>
+    .talvyn-wrap{height:calc(100vh - 80px);padding:1rem 0;}
+    .talvyn-shell{height:100%;display:grid;grid-template-columns:300px 1fr;gap:1rem;}
+    .talvyn-panel{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 6px 18px rgba(28,39,64,.06);}
+    .talvyn-history{padding:.75rem;overflow:auto;height:100%;}
+    .history-item{display:block;padding:.65rem;border-radius:10px;text-decoration:none;color:#1f2937;border:1px solid transparent;}
+    .history-item:hover,.history-item.active{background:#f2f6ff;border-color:#dbe6ff;}
+    .history-preview{font-size:.82rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .chat-main{display:flex;flex-direction:column;height:100%;}
+    .chat-head{padding:.9rem 1rem;border-bottom:1px solid #edf2f7;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:14px 14px 0 0;}
+    .chat-msgs{flex:1;overflow:auto;padding:1rem;background:#f8fafd;}
+    .chat-row{display:flex;margin-bottom:.8rem;}
+    .chat-row.user{justify-content:flex-end;}
+    .bubble{max-width:75%;padding:.7rem .9rem;border-radius:12px;}
+    .chat-row.user .bubble{background:#4465d5;color:#fff;}
+    .chat-row.assistant .bubble{background:#fff;border:1px solid #e5eaf2;}
+    .quick-actions{display:flex;flex-wrap:wrap;gap:.5rem;padding:.75rem 1rem;border-top:1px solid #edf2f7;background:#fff;}
+    .quick-btn{border:1px solid #dbe6ff;background:#f5f8ff;color:#2547ab;border-radius:999px;padding:.35rem .7rem;font-size:.85rem;font-weight:700;}
+    .chat-input{display:flex;gap:.65rem;padding:.9rem;border-top:1px solid #edf2f7;background:#fff;border-radius:0 0 14px 14px;}
+    .typing{font-size:.85rem;color:#64748b;}
+    @media (max-width: 900px){.talvyn-shell{grid-template-columns:1fr;}.talvyn-history{max-height:220px;}}
+  </style>
 </head>
-<body>
-    <div class="chatbot-container">
-        <div class="chatbot-header">
-            <h1>
-                <i class="fas fa-robot"></i>
-                AI Research Assistant
-            </h1>
-            <a href="{% url 'home' %}" class="back-btn">
-                <i class="fas fa-arrow-left"></i> Back to Home
-            </a>
-        </div>
-
-        <div class="chatbot-messages" id="chatMessages">
-            <div class="welcome-message">
-                <i class="fas fa-comments"></i>
-                <h2>Welcome to AI Research Assistant!</h2>
-                <p>Ask me anything about your research publications. I'm here to help!</p>
-            </div>
-        </div>
-
-        <div class="chatbot-input-area">
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="chatInput" 
-                    placeholder="Type your question about publications..." 
-                    autocomplete="off"
-                >
-                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-                    <i class="fas fa-paper-plane"></i>
-                    Send
-                </button>
-            </div>
-        </div>
+<body class="rr-bg">
+  <nav class="navbar navbar-expand-lg sticky-top rr-nav">
+    <div class="container">
+      <a class="navbar-brand rr-brand" href="{% url 'home' %}"><i class="bi bi-file-ppt-fill me-2"></i>ResearchRadar</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#talvynNav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="talvynNav">
+        <ul class="navbar-nav ms-auto">
+          {% if is_faculty %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'upload' %}">Upload</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}">Profile</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'faculty_student_approvals' %}">Student Approvals</a></li>
+            <li class="nav-item"><a class="nav-link active" href="{% url 'chatbot' %}">Talvyn</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+          {% else %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'student_upload' %}">Upload</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'student_profile' %}">Profile</a></li>
+            <li class="nav-item"><a class="nav-link active" href="{% url 'chatbot' %}">Talvyn</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+          {% endif %}
+        </ul>
+      </div>
     </div>
+  </nav>
 
-    <script>
-        const chatMessages = document.getElementById('chatMessages');
-        const chatInput = document.getElementById('chatInput');
-        const sendBtn = document.getElementById('sendBtn');
+  <main class="container talvyn-wrap">
+    <div class="talvyn-shell">
+      <aside class="talvyn-panel talvyn-history">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Recent Chats</h6>
+          <a href="{% url 'chatbot' %}" class="btn btn-sm btn-outline-primary">New</a>
+        </div>
+        <input id="historySearch" class="form-control form-control-sm mb-2" placeholder="Search chat history">
+        <div id="historyList">
+          {% for conv in conversations %}
+            <a class="history-item {% if active_conversation and active_conversation.id == conv.id %}active{% endif %}" href="{% url 'chatbot' %}?conv={{ conv.id }}" data-search="{{ conv.title }} {{ conv.preview }}">
+              <div class="fw-semibold small">{{ conv.title }}</div>
+              <div class="history-preview">{{ conv.preview|default:"No preview yet." }}</div>
+              <div class="text-muted" style="font-size:.75rem;">{{ conv.updated_at|date:"M d, H:i" }}</div>
+            </a>
+          {% empty %}
+            <div class="text-muted small">No chats yet. Start your first conversation with Talvyn.</div>
+          {% endfor %}
+        </div>
+      </aside>
 
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
+      <section class="talvyn-panel chat-main">
+        <div class="chat-head">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">Talvyn</div>
+              <div class="small opacity-75">Career intelligence for growth, summaries, and job guidance</div>
+            </div>
+            <span class="badge bg-light text-dark">AI Assistant</span>
+          </div>
+        </div>
+
+        <div class="chat-msgs" id="chatMessages">
+          {% if active_messages %}
+            {% for msg in active_messages %}
+              <div class="chat-row {{ msg.role }}"><div class="bubble">{{ msg.content|linebreaksbr }}</div></div>
+            {% endfor %}
+          {% else %}
+            <div class="text-center text-muted mt-4">
+              <i class="bi bi-stars fs-1 d-block mb-2"></i>
+              Ask Talvyn for job suggestions, profile analysis, skill gaps, or resume improvements.
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="quick-actions">
+          <button class="quick-btn" data-quick="Suggest jobs for me">Suggest jobs for me</button>
+          <button class="quick-btn" data-quick="Improve my resume">Improve my resume</button>
+          <button class="quick-btn" data-quick="What skills should I learn?">What skills should I learn?</button>
+          <button class="quick-btn" data-quick="Analyze my profile">Analyze my profile</button>
+        </div>
+
+        <div class="chat-input">
+          <input class="form-control" id="chatInput" placeholder="Ask Talvyn anything about your career path..." autocomplete="off">
+          <button class="btn btn-primary" id="sendBtn"><i class="bi bi-send"></i></button>
+        </div>
+        <div id="typingState" class="typing px-3 pb-2 d-none">Talvyn is thinking...</div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const typingState = document.getElementById('typingState');
+    let activeConversationId = "{{ active_conversation.id|default:'' }}";
+    const draftKey = "talvyn_draft";
+    const convKey = "talvyn_active_conversation";
+
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
         }
+      }
+      return cookieValue;
+    }
 
-        function addMessage(content, role = 'assistant', citations = []) {
-            // Remove welcome message if exists
-            const welcomeMsg = chatMessages.querySelector('.welcome-message');
-            if (welcomeMsg) {
-                welcomeMsg.remove();
-            }
+    function addMessage(content, role = "assistant") {
+      const row = document.createElement("div");
+      row.className = `chat-row ${role}`;
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.innerHTML = (content || "").replace(/\n/g, "<br>");
+      row.appendChild(bubble);
+      chatMessages.appendChild(row);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}`;
+    async function sendMessage(messageText = "") {
+      const message = (messageText || chatInput.value || "").trim();
+      if (!message || sendBtn.disabled) return;
+      addMessage(message, "user");
+      chatInput.value = "";
+      localStorage.setItem(draftKey, "");
+      sendBtn.disabled = true;
+      typingState.classList.remove("d-none");
 
-            const bubble = document.createElement('div');
-            bubble.className = 'message-bubble';
-            bubble.innerHTML = content.replace(/\n/g, '<br>');
-
-            if (citations && citations.length > 0) {
-                const citationsDiv = document.createElement('div');
-                citationsDiv.className = 'citations';
-                citationsDiv.innerHTML = '<strong>Sources:</strong><br>' + 
-                    citations.map(c => `• ${c.title || 'Publication'} (${c.year || 'N/A'})${c.venue ? ' - ' + c.venue : ''}`).join('<br>');
-                bubble.appendChild(citationsDiv);
-            }
-
-            messageDiv.appendChild(bubble);
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function showTyping() {
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message assistant';
-            typingDiv.id = 'typingIndicator';
-            typingDiv.innerHTML = '<div class="message-bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';
-            chatMessages.appendChild(typingDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function hideTyping() {
-            const typing = document.getElementById('typingIndicator');
-            if (typing) typing.remove();
-        }
-
-        async function sendMessage() {
-            const message = chatInput.value.trim();
-            if (!message || sendBtn.disabled) return;
-
-            // Add user message
-            addMessage(message, 'user');
-            chatInput.value = '';
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-            showTyping();
-
-            try {
-                const response = await fetch('{% url "chatbot_api" %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({ query: message })
-                });
-
-                const data = await response.json();
-                hideTyping();
-
-                if (response.ok && data.answer) {
-                    addMessage(data.answer, 'assistant', data.citations || []);
-                } else {
-                    addMessage(data.error || 'Sorry, I encountered an error. Please try again.', 'error');
-                }
-            } catch (error) {
-                hideTyping();
-                addMessage('Network error. Please check your connection and try again.', 'error');
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
-            }
-        }
-
-        // Enter key to send
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
+      try {
+        const response = await fetch("{% url 'chatbot_api' %}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
+          body: JSON.stringify({ query: message, conversation_id: activeConversationId || null }),
         });
-    </script>
+        const data = await response.json();
+        if (response.ok && data.answer) {
+          addMessage(data.answer, "assistant");
+          if (data.conversation_id) {
+            activeConversationId = data.conversation_id;
+            localStorage.setItem(convKey, String(activeConversationId));
+          }
+        } else {
+          addMessage(data.error || "Talvyn could not respond right now.", "assistant");
+        }
+      } catch (e) {
+        addMessage("Network issue. Please try again.", "assistant");
+      } finally {
+        sendBtn.disabled = false;
+        typingState.classList.add("d-none");
+      }
+    }
+
+    sendBtn.addEventListener("click", () => sendMessage());
+    chatInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    chatInput.addEventListener("input", () => localStorage.setItem(draftKey, chatInput.value));
+    document.querySelectorAll("[data-quick]").forEach((btn) => {
+      btn.addEventListener("click", () => sendMessage(btn.dataset.quick));
+    });
+    document.getElementById("historySearch").addEventListener("input", (e) => {
+      const q = (e.target.value || "").toLowerCase();
+      document.querySelectorAll("#historyList .history-item").forEach((el) => {
+        const hay = (el.dataset.search || "").toLowerCase();
+        el.style.display = hay.includes(q) ? "" : "none";
+      });
+    });
+
+    const savedDraft = localStorage.getItem(draftKey);
+    if (savedDraft) chatInput.value = savedDraft;
+    const savedConversation = localStorage.getItem(convKey);
+    if (!activeConversationId && savedConversation) {
+      activeConversationId = savedConversation;
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  </script>
 </body>
 </html>
 

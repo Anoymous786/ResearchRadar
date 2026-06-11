@@ -202,14 +202,12 @@
         <ul class="navbar-nav ms-auto">
           <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
           <li class="nav-item"><a class="nav-link active" href="{% url 'upload' %}">Upload</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'generatesummary' %}">Generate Summary</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'settings' %}">Settings</a></li>
-          {% if is_faculty %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}"><i class="bi bi-person-circle"></i> My Profile</a></li>
-          {% endif %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'payment' %}">Pricing</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'help' %}">Help</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">logout</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'faculty_profile' %}">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'faculty_student_approvals' %}">Student Approvals</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
         </ul>
       </div>
     </div>
@@ -299,6 +297,26 @@
         </h5>
       </div>
       <div class="card-body" style="padding: var(--space-6);">
+        {% if pending_publications %}
+          <div class="alert alert-info" style="border-radius: var(--radius-lg); border-left: 4px solid var(--color-primary);">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+              <div>
+                <strong>Do you want to add this data to your profile?</strong>
+                <div class="small text-muted mt-1">This is a preview from the Google Scholar link. Your profile will only update if you choose “Add to Profile”.</div>
+              </div>
+              <form method="post" class="d-flex gap-2">
+                {% csrf_token %}
+                <button class="btn btn-primary" type="submit" name="decision" value="add_to_profile">
+                  <i class="bi bi-check2-circle me-1"></i>Add to Profile
+                </button>
+                <button class="btn btn-outline-secondary" type="submit" name="decision" value="do_not_add">
+                  <i class="bi bi-x-circle me-1"></i>Do Not Add
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+
         <div class="stats-card">
           <div class="stats-number">{{ publications_data|length }}</div>
           <div class="stats-label">Publications Processed</div>

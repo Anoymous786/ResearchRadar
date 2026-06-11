@@ -112,18 +112,34 @@ class StudentProfile(models.Model):
     interests = models.TextField(blank=True, default="")
     projects = models.TextField(blank=True, default="")
     experience = models.TextField(blank=True, default="")
+    # Legacy local file field (kept for backward compatibility; no longer used by upload flow).
     resume = models.FileField(upload_to="resumes/", blank=True, null=True)
+    resume_url = models.URLField(blank=True, null=True)
+    resume_name = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Extra fields already present in older migrations in this repo
     full_name = models.CharField(max_length=200, blank=True, default="")
+    summary = models.TextField(blank=True, default="")
     email = models.CharField(max_length=150, blank=True, default="")
     phone = models.CharField(max_length=20, blank=True, default="")
     branch = models.CharField(max_length=200, blank=True, default="")
     college = models.CharField(max_length=200, blank=True, default="")
     degree = models.CharField(max_length=200, blank=True, default="")
+    location = models.CharField(max_length=200, blank=True, default="")
+    availability = models.CharField(max_length=200, blank=True, default="")
     target_role = models.CharField(max_length=200, blank=True, default="")
     year = models.IntegerField(blank=True, null=True)
+    social_links = models.JSONField(blank=True, default=list)
+    education_entries = models.JSONField(blank=True, default=list)
+    project_entries = models.JSONField(blank=True, default=list)
+    experience_entries = models.JSONField(blank=True, default=list)
+    certification_entries = models.JSONField(blank=True, default=list)
+    interests_entries = models.JSONField(blank=True, default=list)
+    languages_entries = models.JSONField(blank=True, default=list)
+    achievements_entries = models.JSONField(blank=True, default=list)
+    ai_summary = models.TextField(blank=True, null=True, default="")
+    ai_suggestions = models.TextField(blank=True, null=True, default="")
 
     # Approval / freeze system
     approval_status = models.CharField(
@@ -144,3 +160,31 @@ class StudentProfile(models.Model):
     class Meta:
         verbose_name = "Student Profile"
         verbose_name_plural = "Student Profiles"
+
+
+class TalvynConversation(models.Model):
+    user = models.ForeignKey(Users_Publication, on_delete=models.CASCADE, related_name="talvyn_conversations")
+    title = models.CharField(max_length=200, default="New chat")
+    preview = models.CharField(max_length=300, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.user.user_email} - {self.title}"
+
+
+class TalvynMessage(models.Model):
+    ROLE_CHOICES = [("user", "user"), ("assistant", "assistant")]
+    conversation = models.ForeignKey(TalvynConversation, on_delete=models.CASCADE, related_name="messages")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.role}: {self.content[:50]}"

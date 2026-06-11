@@ -1,0 +1,55 @@
+{% extends "student/base_student.html" %}
+{% load static %}
+{% block title %}Upload - ResearchRadar{% endblock %}
+{% block body %}
+  <main class="container py-5">
+    <section class="hero-panel mb-4">
+      <p class="small text-uppercase mb-2 text-info-emphasis">AI-powered resume intelligence</p>
+      <h1 class="display-6 fw-semibold mb-2">Student Resume Analyzer</h1>
+      <p class="mb-0 text-secondary">
+        Upload a PDF resume to extract profile details, run ATS-style role analysis, and get focused improvement suggestions.
+      </p>
+    </section>
+
+    {% if error_message %}
+      <div class="alert alert-danger border-0 shadow-sm">{{ error_message }}</div>
+    {% endif %}
+
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card soft-card h-100">
+          <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">Upload Resume PDF</h5>
+            <form method="post" enctype="multipart/form-data" novalidate>
+              {% csrf_token %}
+              <div class="upload-dropzone mb-3">
+                <i class="bi bi-file-earmark-arrow-up display-6 d-block mb-2"></i>
+                <p class="mb-2 fw-semibold">Choose your latest resume (PDF only)</p>
+                <p class="text-secondary small mb-3">Max size: 5 MB, temporary processing only.</p>
+                <input class="form-control" type="file" name="resume_file" accept=".pdf,application/pdf" required>
+              </div>
+              <button class="btn btn-primary btn-lg px-4" type="submit">
+                <i class="bi bi-stars me-2"></i>Analyze Resume
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card soft-card h-100">
+          <div class="card-body p-4">
+            <h5 class="fw-semibold mb-3">What You Get</h5>
+            <ul class="feature-list mb-0">
+              <li>Strict JSON profile parsing with fallback validation</li>
+              <li>Email and phone regex checks with confidence scoring</li>
+              <li>ATS score, role/domain match, and missing skills</li>
+              <li>Strengths, weaknesses, and practical suggestions</li>
+              <li>Professional card-based result layout</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+{% endblock %}

@@ -1,0 +1,194 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResearchRader - Resume Analyzer</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'premium-design.css' %}">
+  <style>
+    body { background: var(--color-surface); }
+    .profile-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2.25rem 0; margin-bottom: 1.75rem; border-radius: 0 0 20px 20px; }
+    .section-card { background: white; border-radius: 16px; padding: 1.25rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .mini-box { background: #fafcff; border: 1px solid #e8ecf5; border-radius: 12px; padding: .85rem; height: 100%; }
+    .mini-title { color: #4f5f87; font-weight: 700; font-size: .8rem; text-transform: uppercase; margin-bottom: .35rem; }
+    .tag { display: inline-block; padding: .35rem .7rem; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+    .tag-skill { background: #e8f0ff; color: #2447ad; }
+    .tag-miss { background: #ffe9ec; color: #9b1c31; }
+    .progress { height: 10px; border-radius: 999px; background: #e6ecfa; }
+    .progress-bar { background: linear-gradient(90deg, #3b6ff1, #5a8fff); }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-lg">
+    <div class="container p-1">
+      <a class="navbar-brand" href="{% url 'student_dashboard' %}"><i class="bi bi-file-ppt-fill"></i><span>ResearchRadar</span></a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+          <li class="nav-item"><a class="nav-link active" href="{% url 'student_upload' %}">Upload</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'student_profile' %}">Profile</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="profile-header">
+    <div class="container">
+      <h2 class="mb-1"><i class="bi bi-robot me-2"></i>AI Resume Analyzer</h2>
+      <p class="mb-0 opacity-75">Upload your resume, auto-fill your profile, and get ATS-grade recommendations.</p>
+    </div>
+  </div>
+
+  <main class="container mb-5">
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="section-card mb-3">
+            <h5 class="mb-3">Upload Resume</h5>
+            <form method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+              <input class="form-control mb-3" type="file" name="resume_file" accept=".pdf,application/pdf" required>
+              <p class="small text-muted mb-3">PDF only. Max 5 MB.</p>
+              <button class="btn btn-primary w-100" type="submit">
+                Analyze & Update Profile
+              </button>
+            </form>
+        </div>
+
+        {% if result %}
+        <div class="section-card mb-3">
+            <h6 class="mb-2">Prediction</h6>
+            <p class="mb-1"><strong>Predicted Field:</strong> {{ extracted_details.analysis.predicted_role }}</p>
+            <p class="mb-0"><strong>Role Match:</strong> {{ extracted_details.analysis.match_score }}%</p>
+        </div>
+
+        <div class="section-card">
+            <h6 class="mb-2">Overall Score</h6>
+            <div class="display-6 fw-bold text-primary">{{ extracted_details.analysis.ats_score }}</div>
+            <div class="progress mt-2">
+              <div class="progress-bar" style="width: {{ extracted_details.analysis.ats_score }}%;"></div>
+            </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="col-lg-8">
+        <div class="section-card mb-3">
+            <h4 class="mb-3">Resume Analysis</h4>
+            {% if error_message %}<div class="alert alert-danger">{{ error_message }}</div>{% endif %}
+            {% if success_message %}<div class="alert alert-success">{{ success_message }}</div>{% endif %}
+            {% if not result %}
+              <p class="text-muted mb-0">Upload a resume to see profile extraction, recommendations, and ATS score.</p>
+            {% else %}
+              <div class="row g-3">
+                <div class="col-md-4"><div class="mini-box"><div class="mini-title">Name</div><div>{{ extracted_details.personal_info.name|default:"-" }}</div></div></div>
+                <div class="col-md-4"><div class="mini-box"><div class="mini-title">Email</div><div>{{ extracted_details.personal_info.email|default:"-" }}</div></div></div>
+                <div class="col-md-4"><div class="mini-box"><div class="mini-title">Phone</div><div>{{ extracted_details.personal_info.phone|default:"-" }}</div></div></div>
+              </div>
+            {% endif %}
+        </div>
+
+        {% if result %}
+        <div class="section-card mb-3">
+            <h5 class="mb-3">Student Summary</h5>
+            <p class="mb-0">{{ extracted_details.personal_info.summary }}</p>
+        </div>
+
+        <div class="section-card mb-3">
+            <h5 class="mb-3">Skills Recommendation</h5>
+            <p class="text-muted small mb-2">Current Skills</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              {% for skill in extracted_details.skills %}
+                <span class="tag tag-skill">{{ skill }}</span>
+              {% empty %}
+                <span class="text-muted">No technical skills extracted.</span>
+              {% endfor %}
+            </div>
+            <p class="text-muted small mb-2">Recommended to Add</p>
+            <div class="d-flex flex-wrap gap-2">
+              {% for skill in extracted_details.analysis.missing_skills %}
+                <span class="tag tag-miss">{{ skill }}</span>
+              {% empty %}
+                <span class="text-success">No major missing skills detected.</span>
+              {% endfor %}
+            </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="section-card h-100">
+                <h6 class="text-success">Strengths</h6>
+                <ul class="mb-0">
+                  {% for item in result.analysis.strengths %}<li>{{ item }}</li>{% empty %}<li>No strengths found.</li>{% endfor %}
+                </ul>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="section-card h-100">
+                <h6 class="text-danger">Weaknesses</h6>
+                <ul class="mb-0">
+                  {% for item in result.analysis.weaknesses %}<li>{{ item }}</li>{% empty %}<li>No weaknesses found.</li>{% endfor %}
+                </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card mt-3">
+            <h5 class="mb-3">Resume Tips, Keyword Coverage, and Details</h5>
+            <p class="small text-muted mb-1">Keyword Match: {{ extracted_details.analysis.keyword_match_percentage }}%</p>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              {% for keyword in extracted_details.analysis.matched_keywords %}
+                <span class="tag tag-skill">{{ keyword }}</span>
+              {% empty %}
+                <span class="text-muted">No matched keywords found.</span>
+              {% endfor %}
+            </div>
+            <ul class="mb-0">
+              {% for tip in extracted_details.analysis.resume_tips %}<li>{{ tip }}</li>{% empty %}<li>No suggestions right now.</li>{% endfor %}
+            </ul>
+        </div>
+
+        <div class="section-card mt-3">
+          <h5 class="mb-3">Projects</h5>
+          <div class="row g-3">
+            {% for project in extracted_details.projects %}
+              <div class="col-md-6">
+                <div class="mini-box h-100">
+                  <div class="fw-semibold mb-1">{{ project.title }}</div>
+                  <p class="small text-muted mb-2">{{ project.description|default:"No description available." }}</p>
+                  <div class="d-flex flex-wrap gap-2 mb-2">
+                    {% for tech in project.tech_stack %}
+                      <span class="tag tag-skill">{{ tech }}</span>
+                    {% empty %}
+                      <span class="text-muted small">No tech stack listed.</span>
+                    {% endfor %}
+                  </div>
+                  {% if project.links %}
+                    <div class="small">
+                      {% for link in project.links %}
+                        <a href="{{ link }}" target="_blank" rel="noopener noreferrer">Link {{ forloop.counter }}</a>{% if not forloop.last %} | {% endif %}
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% empty %}
+              <div class="col-12"><p class="text-muted mb-0">No projects found.</p></div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

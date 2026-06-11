@@ -1,0 +1,58 @@
+.ref-bg {
+  min-height: 100vh;
+  background: #f6f8fc;
+  color: #1f2937;
+}
+
+.nav-top {
+  background: linear-gradient(90deg, #2952cc, #4b7bec);
+}
+
+.ref-card {
+  border: 1px solid #e7ebf2;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(28, 39, 64, 0.06);
+}
+
+.mini-box {
+  background: #fafcff;
+  border: 1px solid #e7eefc;
+  border-radius: 10px;
+  padding: 0.8rem;
+  min-height: 90px;
+}
+
+.mini-title {
+  color: #4f6391;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.progress {
+  height: 10px;
+  background: #e8eefc;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, #3b6ff1, #5a8fff);
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.tag-skill {
+  background: #e8f0ff;
+  color: #2447ad;
+}
+
+.tag-miss {
+  background: #ffe9ec;
+  color: #9b1c31;
+}

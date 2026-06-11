@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat - ResearchRadar</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="{% static 'student_dashboard.css' %}">
+  <style>
+    .msg-wrap{height:calc(100vh - 86px);padding:1rem 0;}
+    .msg-shell{height:100%;display:grid;grid-template-columns:320px 1fr;gap:1rem;}
+    .msg-panel{background:#fff;border:1px solid #e7ebf2;border-radius:14px;box-shadow:0 6px 18px rgba(28,39,64,.06);}
+    .msg-left{padding:.9rem;display:flex;flex-direction:column;height:100%;}
+    .msg-list{flex:1;overflow:auto;margin-top:.65rem;}
+    .person-item{border:1px solid #ebeff6;border-radius:10px;padding:.65rem .75rem;cursor:pointer;margin-bottom:.5rem;}
+    .person-item.active,.person-item:hover{background:#f2f6ff;border-color:#dbe6ff;}
+    .person-meta{font-size:.8rem;color:#64748b;}
+    .msg-right{display:flex;flex-direction:column;height:100%;}
+    .msg-head{padding:.9rem 1rem;border-bottom:1px solid #edf2f7;}
+    .msg-body{flex:1;overflow:auto;padding:1rem;background:#f8fafd;}
+    .msg-row{display:flex;margin-bottom:.7rem;}
+    .msg-row.sent{justify-content:flex-end;}
+    .msg-bubble{max-width:72%;padding:.62rem .82rem;border-radius:12px;white-space:pre-wrap;word-break:break-word;}
+    .msg-row.sent .msg-bubble{background:#4465d5;color:#fff;}
+    .msg-row.recv .msg-bubble{background:#fff;border:1px solid #e5eaf2;}
+    .msg-input{display:flex;gap:.6rem;padding:.85rem;border-top:1px solid #edf2f7;background:#fff;border-radius:0 0 14px 14px;}
+    @media (max-width: 920px){.msg-shell{grid-template-columns:1fr;}.msg-left{max-height:280px;}}
+  </style>
+</head>
+<body class="rr-bg">
+  <nav class="navbar navbar-expand-lg sticky-top rr-nav">
+    <div class="container">
+      <a class="navbar-brand rr-brand" href="{% url 'home' %}"><i class="bi bi-file-ppt-fill me-2"></i>ResearchRadar</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#chatNav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="chatNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Home</a></li>
+          <li class="nav-item"><a class="nav-link active" href="{% url 'chat' %}">Chat</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'messages' %}">Messages</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'chatbot' %}">Talvyn</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'logout' %}">Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container msg-wrap">
+    <div class="msg-shell">
+      <aside class="msg-panel msg-left">
+        <input id="userSearch" class="form-control" placeholder="Search users…">
+        <div class="msg-list" id="userList"></div>
+      </aside>
+
+      <section class="msg-panel msg-right">
+        <div class="msg-head">
+          <div class="fw-semibold" id="chatTitle">Select a user to start chatting</div>
+          <div class="text-muted small" id="chatStatus"> </div>
+        </div>
+        <div class="msg-body" id="msgBody">
+          <div class="text-center text-muted mt-4">Pick a user on the left.</div>
+        </div>
+        <div class="msg-input">
+          <input id="msgInput" class="form-control" placeholder="Type your message..." autocomplete="off" disabled>
+          <button id="sendBtn" class="btn btn-primary" disabled><i class="bi bi-send"></i></button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Supabase JS SDK (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    window.__CHAT_BOOTSTRAP__ = {
+      meId: "{{ current_user_id }}",
+      meName: "{{ current_user_name|escapejs }}",
+      supabaseUrl: "{{ supabase_url|escapejs }}",
+      supabaseAnonKey: "{{ supabase_anon_key|escapejs }}",
+      peers: {{ chat_peers_json|safe }},
+    };
+  </script>
+  <script src="{% static 'chat.js' %}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
